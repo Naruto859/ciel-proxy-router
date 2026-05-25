@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ciel Proxy | Liquid Glass</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --glass: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --accent: #a78bfa;
+        }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+        .liquid-blob {
+            position: fixed;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(167,139,250,0.3) 0%, rgba(139,92,246,0) 70%);
+            border-radius: 50%;
+            z-index: -1;
+            filter: blur(50px);
+            animation: move 20s infinite alternate;
+        }
+        @keyframes move {
+            from { transform: translate(-10%, -10%); }
+            to { transform: translate(100%, 80%); }
+        }
+        .glass-panel {
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+        input, button {
+            outline: none !important;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .pulse { animation: pulse-animation 2s infinite; }
+        @keyframes pulse-animation {
+            0% { box-shadow: 0 0 0 0px rgba(167, 139, 250, 0.4); }
+            100% { box-shadow: 0 0 0 10px rgba(167, 139, 250, 0); }
+        }
+        #login-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(20px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .hide { display: none !important; }
+        
+        /* Tabs */
+        .tab-btn {
+            padding: 0.5rem 1rem;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .tab-btn.active {
+            border-bottom-color: var(--accent);
+            color: var(--accent);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="liquid-blob"></div>
+    
+    <!-- Auth Overlay -->
+    <div id="login-overlay">
+        <div class="glass-panel p-8 w-full max-w-md text-center">
+            <h1 class="text-3xl font-bold mb-6 text-purple-300">Ciel Admin</h1>
+            <p class="text-slate-400 mb-6">Enter System Password to access dashboard</p>
+            <input type="password" id="pin-input" placeholder="••••••••" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-center text-2xl tracking-widest mb-4">
+            <button onclick="login()" class="w-full bg-purple-600 hover:bg-purple-500 p-4 rounded-xl font-semibold transition-all">Unlock System</button>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <main class="max-w-6xl mx-auto hide" id="dashboard">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
+            <div>
+                <h1 class="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-300">
+                    Ciel Multi-Agent Gateway
+                </h1>
+                <p class="text-slate-400 mt-1">Status: <span class="text-green-400 font-medium">System Online</span></p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="showPasswordModal()" class="glass-panel px-4 py-2 hover:bg-white/10 transition-all font-medium text-sm">
+                    ⚙️ Change Password
+                </button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="glass-panel p-6">
+                <p class="text-slate-400 text-sm mb-1">Active Upstream Keys</p>
+                <h3 class="text-3xl font-bold" id="stat-active-keys">0</h3>
+            </div>
+            <div class="glass-panel p-6">
+                <p class="text-slate-400 text-sm mb-1">Total Upstream Balance</p>
+                <h3 class="text-3xl font-bold text-purple-300" id="stat-total-pollen">0.00</h3>
+            </div>
+            <div class="glass-panel p-6">
+                <p class="text-slate-400 text-sm mb-1">Client Agents</p>
+                <h3 class="text-3xl font-bold text-blue-300" id="stat-client-keys">0</h3>
+            </div>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="flex gap-4 border-b border-white/10 mb-6">
+            <div class="tab-btn active" onclick="switchTab('upstream')" id="tab-upstream">Upstream Provider Keys</div>
+            <div class="tab-btn" onclick="switchTab('clients')" id="tab-clients">Client API Keys</div>
+        </div>
+
+        <!-- Upstream Tab -->
+        <div id="section-upstream" class="glass-panel overflow-hidden">
+            <div class="p-6 border-b border-white/10 flex justify-between items-center">
+                <h2 class="text-xl font-semibold">Pollinations Keys (Upstream)</h2>
+                <div class="flex gap-3">
+                    <button onclick="refreshData()" class="text-sm text-purple-400 hover:text-purple-300">Refresh All</button>
+                    <button onclick="showAddModal()" class="text-sm bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-medium transition-all">+ Add Upstream Key</button>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-slate-400 text-sm border-b border-white/5">
+                            <th class="p-6 font-medium">Priority</th>
+                            <th class="p-6 font-medium">Key Snippet</th>
+                            <th class="p-6 font-medium">Balance</th>
+                            <th class="p-6 font-medium">Status</th>
+                            <th class="p-6 font-medium text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="keys-table-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Clients Tab -->
+        <div id="section-clients" class="glass-panel overflow-hidden hide">
+            <div class="p-6 border-b border-white/10 flex justify-between items-center">
+                <h2 class="text-xl font-semibold">Client Agent Keys</h2>
+                <div class="flex gap-3">
+                    <input type="text" id="new-client-name" placeholder="Agent Name (e.g. Hermes)" class="bg-white/5 border border-white/10 px-3 py-2 rounded-lg text-sm">
+                    <button onclick="addClientKey()" class="text-sm bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg font-medium transition-all">+ Generate Key</button>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-slate-400 text-sm border-b border-white/5">
+                            <th class="p-6 font-medium">Agent Name</th>
+                            <th class="p-6 font-medium">API Key</th>
+                            <th class="p-6 font-medium">Created At</th>
+                            <th class="p-6 font-medium text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="client-keys-table-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal for Adding Upstream Key -->
+    <div id="add-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hide">
+        <div class="glass-panel p-8 w-full max-w-lg">
+            <h2 class="text-2xl font-bold mb-6">Register Upstream API Key</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-sm text-slate-400 block mb-2">Pollinations Key</label>
+                    <input type="text" id="new-key" placeholder="sk-..." class="w-full bg-white/5 border border-white/10 p-4 rounded-xl">
+                </div>
+                <div>
+                    <label class="text-sm text-slate-400 block mb-2">Priority (Higher = used first)</label>
+                    <input type="number" id="new-priority" value="0" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl">
+                </div>
+                <div class="flex gap-4 mt-8">
+                    <button onclick="hideAddModal()" class="flex-1 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all">Cancel</button>
+                    <button onclick="addKey()" class="flex-1 p-4 rounded-xl bg-purple-600 hover:bg-purple-500 font-semibold transition-all">Save Key</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal for Changing Password -->
+    <div id="password-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hide">
+        <div class="glass-panel p-8 w-full max-w-lg">
+            <h2 class="text-2xl font-bold mb-6">Change Admin Password</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-sm text-slate-400 block mb-2">New Password</label>
+                    <input type="password" id="new-password" placeholder="••••••••" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl">
+                </div>
+                <div class="flex gap-4 mt-8">
+                    <button onclick="hidePasswordModal()" class="flex-1 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all">Cancel</button>
+                    <button onclick="changePassword()" class="flex-1 p-4 rounded-xl bg-purple-600 hover:bg-purple-500 font-semibold transition-all">Update</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Displaying New Client Key -->
+    <div id="new-client-key-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hide">
+        <div class="glass-panel p-8 w-full max-w-lg">
+            <h2 class="text-2xl font-bold mb-2">Key Generated Successfully!</h2>
+            <p class="text-red-400 text-sm mb-6 font-semibold">Copy this key now. You will not be able to see it fully again.</p>
+            <div class="space-y-4">
+                <input type="text" id="display-new-client-key" readonly class="w-full bg-black/30 border border-white/10 p-4 rounded-xl font-mono text-center text-lg text-green-300">
+                <div class="flex mt-8">
+                    <button onclick="closeNewClientKeyModal()" class="w-full p-4 rounded-xl bg-purple-600 hover:bg-purple-500 font-semibold transition-all">I have copied it</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let sessionToken = '';
+
+        async function login() {
+            const pin = document.getElementById('pin-input').value;
+            const res = await fetch('/admin/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pin })
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                sessionToken = data.token;
+                document.getElementById('login-overlay').classList.add('hide');
+                document.getElementById('dashboard').classList.remove('hide');
+                refreshData();
+                refreshClientKeys();
+            } else {
+                alert('Invalid System Password');
+            }
+        }
+        
+        function switchTab(tab) {
+            document.getElementById('tab-upstream').classList.remove('active');
+            document.getElementById('tab-clients').classList.remove('active');
+            document.getElementById('section-upstream').classList.add('hide');
+            document.getElementById('section-clients').classList.add('hide');
+            
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            document.getElementById(`section-${tab}`).classList.remove('hide');
+        }
+
+        async function refreshData() {
+            const res = await fetch('/admin/keys', {
+                headers: { 'Authorization': `Bearer ${sessionToken}` }
+            });
+            const data = await res.json();
+            
+            const tbody = document.getElementById('keys-table-body');
+            tbody.innerHTML = '';
+            
+            let total = 0;
+            let active = 0;
+
+            data.keys.forEach(k => {
+                total += (k.balance > 0 ? k.balance : 0);
+                if (k.is_active) active++;
+
+                const row = document.createElement('tr');
+                row.className = 'border-b border-white/5 hover:bg-white/5 transition-all';
+                row.innerHTML = `
+                    <td class="p-6">
+                        <span class="${k.priority > 0 ? 'text-yellow-400' : 'text-slate-400'} font-bold">
+                            ${k.priority > 0 ? 'PRIMARY' : 'NORMAL'}
+                        </span>
+                    </td>
+                    <td class="p-6 font-mono text-sm">${k.key.substring(0, 12)}...</td>
+                    <td class="p-6 font-semibold">${k.balance.toFixed(4)} P</td>
+                    <td class="p-6">
+                        <span class="flex items-center gap-2">
+                            <span class="status-dot ${k.balance > 0 ? 'bg-green-400 pulse' : 'bg-red-400'}"></span>
+                            ${k.balance > 0 ? 'Healthy' : 'Empty/Blocked'}
+                        </span>
+                    </td>
+                    <td class="p-6 text-right">
+                        <button onclick="testKey('${k.key}')" class="text-xs bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full mr-2 hover:bg-purple-500/40">Test</button>
+                        <button onclick="deleteKey('${k.key}')" class="text-xs bg-red-500/20 text-red-300 px-3 py-1 rounded-full hover:bg-red-500/40">Remove</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            document.getElementById('stat-active-keys').innerText = active;
+            document.getElementById('stat-total-pollen').innerText = total.toFixed(4);
+        }
+
+        async function refreshClientKeys() {
+            const res = await fetch('/admin/client-keys', {
+                headers: { 'Authorization': `Bearer ${sessionToken}` }
+            });
+            const data = await res.json();
+            
+            const tbody = document.getElementById('client-keys-table-body');
+            tbody.innerHTML = '';
+            
+            document.getElementById('stat-client-keys').innerText = data.keys.length;
+
+            data.keys.forEach(k => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-white/5 hover:bg-white/5 transition-all';
+                row.innerHTML = `
+                    <td class="p-6 font-semibold">${k.name}</td>
+                    <td class="p-6 font-mono text-sm">${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}</td>
+                    <td class="p-6 text-slate-400 text-sm">${new Date(k.created_at).toLocaleString()}</td>
+                    <td class="p-6 text-right">
+                        <button onclick="deleteClientKey('${k.key}')" class="text-xs bg-red-500/20 text-red-300 px-4 py-2 rounded-lg hover:bg-red-500/40 font-medium transition-all">Revoke</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function addKey() {
+            const key = document.getElementById('new-key').value;
+            const priority = document.getElementById('new-priority').value;
+            if(!key) return alert("Key is required");
+            
+            await fetch('/admin/keys', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${sessionToken}`
+                },
+                body: JSON.stringify({ key, priority: parseInt(priority) })
+            });
+            
+            document.getElementById('new-key').value = '';
+            hideAddModal();
+            refreshData();
+        }
+        
+        async function addClientKey() {
+            const name = document.getElementById('new-client-name').value;
+            if(!name) return alert("Agent name is required");
+            
+            const res = await fetch('/admin/client-keys', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${sessionToken}`
+                },
+                body: JSON.stringify({ name })
+            });
+            
+            if(res.ok) {
+                const data = await res.json();
+                document.getElementById('new-client-name').value = '';
+                document.getElementById('display-new-client-key').value = data.key;
+                document.getElementById('new-client-key-modal').classList.remove('hide');
+                refreshClientKeys();
+            }
+        }
+        
+        function closeNewClientKeyModal() {
+            document.getElementById('new-client-key-modal').classList.add('hide');
+            document.getElementById('display-new-client-key').value = '';
+        }
+
+        async function changePassword() {
+            const new_password = document.getElementById('new-password').value;
+            if(!new_password) return alert("Password is required");
+            
+            const res = await fetch('/admin/password', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${sessionToken}`
+                },
+                body: JSON.stringify({ new_password })
+            });
+            
+            if(res.ok) {
+                alert("Admin password updated successfully!");
+                document.getElementById('new-password').value = '';
+                hidePasswordModal();
+            }
+        }
+
+        async function testKey(key) {
+            const res = await fetch(`/admin/test/${key}`, {
+                headers: { 'Authorization': `Bearer ${sessionToken}` }
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert(`Success! Balance: ${data.balance}`);
+                refreshData();
+            } else {
+                alert('Test failed. Key might be invalid or blocked.');
+            }
+        }
+
+        async function deleteKey(key) {
+            if (!confirm('Remove this upstream key?')) return;
+            await fetch(`/admin/keys/${key}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${sessionToken}` }
+            });
+            refreshData();
+        }
+        
+        async function deleteClientKey(key) {
+            if (!confirm('CRITICAL: Are you sure you want to REVOKE this Client Key? Agents using it will instantly fail.')) return;
+            await fetch(`/admin/client-keys/${key}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${sessionToken}` }
+            });
+            refreshClientKeys();
+        }
+
+        function showAddModal() { document.getElementById('add-modal').classList.remove('hide'); }
+        function hideAddModal() { document.getElementById('add-modal').classList.add('hide'); }
+        function showPasswordModal() { document.getElementById('password-modal').classList.remove('hide'); }
+        function hidePasswordModal() { document.getElementById('password-modal').classList.add('hide'); }
+    </script>
+</body>
+</html>
