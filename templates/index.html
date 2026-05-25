@@ -413,15 +413,20 @@
         }
 
         async function testKey(key) {
-            const res = await fetch(`/admin/test/${key}`, {
-                headers: { 'Authorization': `Bearer ${sessionToken}` }
-            });
-            const data = await res.json();
-            if (data.success) {
-                alert(`Success! Balance: ${data.balance}`);
-                refreshData();
-            } else {
-                alert('Test failed. Key might be invalid or blocked.');
+            try {
+                const res = await fetch(`/admin/test/${key}`, {
+                    headers: { 'Authorization': `Bearer ${sessionToken}` }
+                });
+                const data = await res.json();
+                await refreshData();
+                if (data.success) {
+                    setTimeout(() => alert(`Success! Balance: ${data.balance}`), 10);
+                } else {
+                    setTimeout(() => alert('Test failed. Key might be invalid or blocked.'), 10);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Test failed due to network error.');
             }
         }
 

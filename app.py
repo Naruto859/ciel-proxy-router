@@ -127,6 +127,9 @@ class KeyManager:
                 balance = response.json().get("balance", 0.0)
                 db.update_balance(key, balance)
                 return balance
+            else:
+                db.update_balance(key, 0.0)
+                return -2.0
         except Exception as e:
             logger.error(f"Balance check failed for {key[:10]}: {e}")
         return -2.0 # Error state
@@ -297,7 +300,7 @@ async def smart_proxy(request: Request, path: str):
             
             response = await proxy_client.send(proxy_req, stream=True)
             
-            if response.status_code in (401, 403, 429):
+            if response.status_code in (400, 401, 402, 403, 429, 500, 502, 503):
                 logger.warning(f"Key {active_key[:10]} failed with {response.status_code}. Retrying with next key...")
                 await response.aread()
                 await response.aclose()
