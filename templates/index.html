@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CIEL | Premium Command Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -14,61 +14,32 @@
             --neon-violet: #8b5cf6;
         }
 
-        /* --- STRICT SCALING FOR MOBILE --- */
-        html, body { 
-            height: 100vh; 
+        body { 
+            margin: 0; 
             overflow: hidden; 
-            margin: 0; padding: 0; 
-            background-color: #0b0914; 
+            height: 100vh; 
+            background-color: #050510; 
             color: white; 
             font-family: 'Outfit', sans-serif; 
         }
 
-        /* Desktop Grid */
-        .bento-container {
-            display: grid;
-            grid-template-columns: 320px 1fr 350px;
-            gap: 1rem;
+        /* --- THE CSS SCALING TRICK --- */
+        #main-wrapper {
+            width: 100vw;
             height: 100vh;
-            padding: 1rem;
-            overflow: hidden;
-            width: 100%;
-            transition: opacity 0.7s;
-        }
-        .bento-col {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            height: 100%;
-            overflow: hidden;
-        }
-        .scrollable-panel {
-            flex: 1;
             overflow-y: auto;
-            padding-right: 4px;
+            transform-origin: top left;
+            position: relative;
+            z-index: 1;
         }
-
-        /* Mobile Scaling Hack (The 30% Missing Piece) */
+        
         @media (max-width: 1023px) {
-            body {
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
+            #main-wrapper {
+                width: 166vw; /* Compensate for scaling (100 / 0.6) */
+                height: 166vh;
+                transform: scale(0.60); /* Zooms out the entire UI */
+                padding-bottom: 50px;
             }
-            .bento-container {
-                display: flex;
-                flex-direction: column;
-                transform: scale(0.75);
-                transform-origin: top center;
-                height: 133.33vh; /* 100 / 0.75 */
-                width: 133.33vw;
-                margin-left: -16.66vw;
-                padding: 1.5rem;
-                overflow-y: auto;
-            }
-            .bento-col { height: auto; overflow: visible; }
-            .scrollable-panel { overflow-y: visible; }
-            .terminal-col { height: 300px; flex-shrink: 0; }
         }
 
         /* Animated Liquid Background */
@@ -88,6 +59,8 @@
         }
         .blob-1 { width: 50vw; height: 50vw; background: rgba(0, 255, 214, 0.15); top: -10%; left: -10%; }
         .blob-2 { width: 40vw; height: 40vw; background: rgba(139, 92, 246, 0.15); bottom: -10%; right: -10%; animation-delay: -5s; }
+        .blob-3 { width: 30vw; height: 30vw; background: rgba(255, 0, 128, 0.15); top: 30%; right: 20%; animation-delay: -10s; }
+        
         @keyframes float {
             0% { transform: translate(0, 0) scale(1); }
             100% { transform: translate(10%, 10%) scale(1.1); }
@@ -101,7 +74,6 @@
             border: 1px solid var(--glass-border);
             border-radius: 16px;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-            position: relative;
         }
 
         /* Glowing AI Core Logo */
@@ -133,218 +105,276 @@
         }
         @keyframes spin { 100% { transform: rotate(360deg); } }
 
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
-
-        /* 3D Compact Card */
+        /* --- EXACT UIVERSE 3D CARDS (Smit-Prajapati) --- */
+        .parent-3d {
+            width: 290px;
+            height: 300px;
+            perspective: 1000px;
+            margin: 0 auto;
+        }
         .card-3d {
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            height: 100%;
+            border-radius: 50px;
+            background: linear-gradient(135deg, rgb(0, 255, 214) 0%, rgb(8, 226, 96) 100%);
+            transition: all 0.5s ease-in-out;
             transform-style: preserve-3d;
-            border-left: 3px solid var(--neon-cyan);
-            background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+            box-shadow: rgba(5, 71, 17, 0) 40px 50px 25px -40px, rgba(5, 71, 17, 0.2) 0px 25px 25px -5px;
+            position: relative;
         }
-        .card-3d:hover {
-            transform: translateY(-3px) scale(1.01) rotateX(2deg);
-            box-shadow: 0 10px 20px rgba(0, 255, 214, 0.15), 0 4px 6px rgba(0,0,0,0.3);
-            border-left-color: #fff;
-            background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 100%);
+        .card-3d.dead {
+            background: linear-gradient(135deg, rgb(255, 50, 50) 0%, rgb(150, 0, 0) 100%);
         }
-        .card-3d.dead { border-left-color: #ef4444; }
-
-        /* Progress Bars */
-        .prog-bg { background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; overflow: hidden; margin-top: 4px; }
-        .prog-fill { background: linear-gradient(90deg, var(--neon-violet), var(--neon-cyan)); height: 100%; transition: width 1s ease-out; }
-
-        /* Buttons & Inputs */
-        .ciel-input {
-            background: rgba(0,0,0,0.4);
-            border: 1px solid var(--glass-border);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            outline: none;
-            transition: all 0.2s;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
+        .card-3d.priority {
+            background: linear-gradient(135deg, rgb(65, 88, 208) 0%, rgb(200, 80, 192) 100%);
         }
-        .ciel-input:focus { border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0,255,214,0.2); }
-        
-        .ciel-btn {
-            background: rgba(255,255,255,0.1);
-            border: 1px solid var(--glass-border);
-            color: white;
+        .card-glass {
+            transform-style: preserve-3d;
+            position: absolute;
+            inset: 8px;
+            border-radius: 55px;
+            border-top-right-radius: 100%;
+            background: linear-gradient(0deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.4) 100%);
+            transform: translate3d(0px, 0px, 25px);
+            border-left: 1px solid rgba(255,255,255,0.3);
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+            transition: all 0.5s ease-in-out;
+            pointer-events: none;
+        }
+        .card-content {
+            padding: 80px 30px 0px 20px;
+            transform: translate3d(0, 0, 26px);
+            pointer-events: none;
+            position: absolute;
+            width: 100%;
+        }
+        .card-content .card-title {
+            display: block;
+            color: #0f172a;
+            font-weight: 900;
+            font-size: 18px;
+            word-break: break-all;
+            margin-bottom: 5px;
+        }
+        .card-content .card-text {
+            display: block;
+            color: rgba(15, 23, 42, 0.8);
+            font-size: 14px;
             font-weight: 600;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .card-bottom {
+            padding: 10px 12px;
+            transform-style: preserve-3d;
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transform: translate3d(0, 0, 26px);
+            z-index: 10;
+        }
+        .card-btn {
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.4);
+            color: #0f172a;
+            font-weight: bold;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
             transition: all 0.2s;
             cursor: pointer;
-            font-size: 0.85rem;
-            display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .card-btn:hover { background: rgba(255,255,255,0.4); transform: scale(1.05); }
+        .card-btn.danger { background: rgba(255,0,0,0.1); color: #ffcccc; border-color: rgba(255,0,0,0.3); }
+        .card-btn.danger:hover { background: rgba(255,0,0,0.4); color: white; }
+
+        .parent-3d:hover .card-3d {
+            transform: rotate3d(1, 1, 0, 25deg);
+            box-shadow: rgba(5, 71, 17, 0.3) 30px 50px 25px -40px, rgba(5, 71, 17, 0.1) 0px 25px 30px 0px;
+        }
+
+        /* Top Bar Layout */
+        .dashboard-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Progress Bars */
+        .prog-container { width: 100%; display: flex; gap: 15px; }
+        .prog-box { flex: 1; background: rgba(0,0,0,0.4); padding: 10px 15px; border-radius: 12px; border: 1px solid var(--glass-border); }
+        .prog-bg { background-color: rgba(255,255,255,0.1); border-radius: 9999px; height: 8px; overflow: hidden; margin-top: 8px; }
+        .prog-fill { background: linear-gradient(90deg, var(--neon-violet), var(--neon-cyan)); height: 100%; transition: width 1s ease-out; }
+
+        /* Terminal Fixed at Bottom */
+        .terminal-panel {
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(15px);
+            border-top: 1px solid var(--neon-cyan);
+            height: 250px;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            z-index: 10;
+        }
+        
+        .ciel-input {
+            background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); color: white;
+            padding: 0.75rem 1rem; border-radius: 8px; outline: none; transition: all 0.2s;
+            font-family: 'JetBrains Mono', monospace; width: 100%;
+        }
+        .ciel-input:focus { border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0,255,214,0.2); }
+        .ciel-btn {
+            background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); color: white;
+            font-weight: 600; padding: 0.75rem 1.5rem; border-radius: 8px; transition: all 0.2s; cursor: pointer;
         }
         .ciel-btn:hover { background: rgba(0,255,214,0.2); border-color: var(--neon-cyan); color: var(--neon-cyan); }
-        .ciel-btn.primary { background: var(--neon-cyan); color: #000; border-color: var(--neon-cyan); }
-        .ciel-btn.primary:hover { background: #fff; box-shadow: 0 0 15px var(--neon-cyan); }
-        .ciel-btn.danger:hover { background: rgba(239,68,68,0.2); border-color: #ef4444; color: #ef4444; }
 
         /* Premium Glass Toasts */
         #toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
         .toast {
             background: rgba(10, 15, 30, 0.85); backdrop-filter: blur(12px);
             border: 1px solid var(--glass-border); border-left: 4px solid var(--neon-cyan);
-            color: white; padding: 12px 16px; border-radius: 8px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            font-size: 0.85rem; font-weight: 600;
-            display: flex; align-items: center; gap: 10px;
-            transform: translateX(120%); opacity: 0;
-            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            pointer-events: auto;
+            color: white; padding: 12px 16px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 10px;
+            transform: translateX(120%); opacity: 0; transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
         .toast.show { transform: translateX(0); opacity: 1; }
         .toast.error { border-left-color: #ef4444; }
         
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); z-index: 100; display: flex; align-items: center; justify-content: center; }
         .hide { display: none !important; }
-        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); z-index: 100; display: flex; align-items: center; justify-content: center; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
     </style>
 </head>
 <body>
     <div class="liquid-bg">
         <div class="liquid-blob blob-1"></div>
         <div class="liquid-blob blob-2"></div>
+        <div class="liquid-blob blob-3"></div>
     </div>
 
     <div id="toast-container"></div>
 
-    <!-- Login Auth -->
+    <!-- Login -->
     <div id="login-overlay" class="overlay">
-        <div class="glass-panel p-8 w-full max-w-sm text-center mx-4">
-            <div class="ai-core mx-auto mb-6"></div>
-            <h1 class="text-2xl font-bold mb-1 tracking-wider text-white">CIEL <span class="text-[#00ffd6]">GATEWAY</span></h1>
-            <p class="text-xs text-slate-400 mb-6 font-mono tracking-widest">AWAITING SYSTEM AUTHORIZATION</p>
-            <input type="password" id="pin-input" placeholder="ACCESS PIN" class="ciel-input w-full text-center text-xl tracking-widest mb-6 py-3" onkeydown="if(event.key==='Enter') login()">
-            <button onclick="login()" class="ciel-btn primary w-full py-3 text-sm tracking-wider">AUTHENTICATE</button>
+        <div class="glass-panel p-10 w-full max-w-sm text-center">
+            <div class="ai-core mx-auto mb-8"></div>
+            <h1 class="text-3xl font-bold mb-2 tracking-widest text-white">CIEL</h1>
+            <p class="text-xs text-slate-400 mb-8 font-mono tracking-widest">SYSTEM AUTHORIZATION</p>
+            <input type="password" id="pin-input" placeholder="PASSCODE" class="ciel-input text-center text-2xl tracking-widest mb-6" onkeydown="if(event.key==='Enter') login()">
+            <button onclick="login()" class="ciel-btn w-full !bg-[var(--neon-cyan)] !text-black !border-[var(--neon-cyan)] hover:!bg-white">AUTHENTICATE</button>
         </div>
     </div>
 
-    <!-- MAIN BENTO DASHBOARD -->
-    <main id="dashboard" class="bento-container hide opacity-0">
+    <!-- MAIN SCALABLE WRAPPER -->
+    <div id="main-wrapper" class="hide opacity-0 transition-opacity duration-700">
         
-        <!-- LEFT COLUMN: Identity, Stats, Clients -->
-        <div class="bento-col">
-            <!-- Header Identity -->
-            <div class="glass-panel p-5 flex items-center justify-between shrink-0">
-                <div class="flex items-center gap-3">
+        <div class="dashboard-layout pb-[260px]">
+            
+            <!-- Header Row -->
+            <div class="glass-panel p-6 flex items-center justify-between">
+                <div class="flex items-center gap-4">
                     <div class="ai-core"></div>
                     <div>
-                        <h1 class="text-xl font-bold leading-tight tracking-wider">CIEL</h1>
-                        <p class="text-[10px] font-mono text-[#00ffd6] tracking-widest">SYSTEM ONLINE</p>
+                        <h1 class="text-3xl font-bold leading-none">CIEL</h1>
+                        <p class="text-xs font-mono text-[#00ffd6] tracking-widest mt-1">COMMAND CENTER</p>
                     </div>
                 </div>
-                <div class="flex gap-2 relative">
-                    <button onclick="refreshAll()" class="p-2 bg-white/5 hover:bg-[#00ffd6]/20 rounded-lg text-white hover:text-[#00ffd6] transition-colors" title="Sync">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    </button>
-                    <button onclick="toggleMenu()" class="p-2 bg-white/5 hover:bg-white/20 rounded-lg text-white transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
-                    </button>
-                    <!-- Dropdown -->
-                    <div id="dropdown-menu" class="absolute right-0 top-full mt-2 w-40 glass-panel py-2 hide z-50 flex flex-col">
-                        <button onclick="showPasswordModal(); toggleMenu()" class="px-4 py-2 text-left hover:bg-[#00ffd6]/10 text-sm text-[#00ffd6]">Change Pass</button>
-                        <button onclick="logout()" class="px-4 py-2 text-left hover:bg-red-500/10 text-sm text-red-400 border-t border-white/10 mt-1 pt-2">Logout</button>
+                
+                <div class="flex items-center gap-6">
+                    <div class="text-right">
+                        <p class="text-[10px] font-mono text-slate-400 mb-1">TOTAL POOL</p>
+                        <h2 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-[#00ffd6] leading-none" id="stat-total-pollen">0.00</h2>
+                    </div>
+                    
+                    <div class="flex gap-2 relative">
+                        <button onclick="refreshAll()" class="p-3 bg-white/5 hover:bg-[#00ffd6]/20 rounded-xl text-white hover:text-[#00ffd6] transition-colors" title="Sync">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        </button>
+                        <button onclick="toggleMenu()" class="p-3 bg-white/5 hover:bg-white/20 rounded-xl text-white transition-colors">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+                        </button>
+                        <!-- Dropdown -->
+                        <div id="dropdown-menu" class="absolute right-0 top-full mt-2 w-48 glass-panel py-2 hide z-50 flex flex-col">
+                            <button onclick="showAddModal(); toggleMenu()" class="px-4 py-3 text-left hover:bg-[#00ffd6]/10 text-sm text-[#00ffd6] font-bold">Add Node</button>
+                            <button onclick="showClientModal(); toggleMenu()" class="px-4 py-3 text-left hover:bg-[#00ffd6]/10 text-sm text-white">Add Agent</button>
+                            <button onclick="showPasswordModal(); toggleMenu()" class="px-4 py-3 text-left hover:bg-white/10 text-sm text-slate-300">Change Pass</button>
+                            <button onclick="logout()" class="px-4 py-3 text-left hover:bg-red-500/10 text-sm text-red-400 border-t border-white/10">Logout</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Global Balance -->
-            <div class="glass-panel p-5 shrink-0">
-                <p class="text-[10px] font-mono text-slate-400 mb-1">TOTAL UPSTREAM BALANCE</p>
-                <div class="flex items-baseline gap-2">
-                    <h2 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-[#00ffd6]" id="stat-total-pollen">0.00</h2>
-                    <span class="text-sm font-mono text-[#00ffd6]">P</span>
-                </div>
-                <div class="mt-2 flex items-center gap-2 text-xs font-mono text-slate-300">
-                    <div class="w-2 h-2 bg-[#00ffd6] rounded-full shadow-[0_0_5px_#00ffd6]"></div>
-                    <span id="stat-active-keys" class="font-bold text-white">0</span> ACTIVE NODES
-                </div>
-            </div>
-
-            <!-- Analytics Bento -->
-            <div class="glass-panel p-5 shrink-0">
+            <!-- Analytics Strip -->
+            <div class="glass-panel p-6">
                 <div class="flex items-center gap-2 mb-4">
-                    <svg class="w-4 h-4 text-[#8b5cf6]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                    <h3 class="text-sm font-bold tracking-wider">USAGE TRAFFIC</h3>
+                    <svg class="w-5 h-5 text-[#8b5cf6]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    <h3 class="text-base font-bold tracking-wider">USAGE TRAFFIC</h3>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <div class="flex justify-between text-[10px] font-mono text-slate-400"><span>24H</span><span id="ana-today" class="text-white">0</span></div>
+                <div class="prog-container">
+                    <div class="prog-box">
+                        <div class="flex justify-between text-xs font-mono text-slate-300 mb-1"><span>24H CYCLE</span><span id="ana-today" class="font-bold text-white">0</span></div>
                         <div class="prog-bg"><div class="prog-fill" id="bar-today" style="width: 0%"></div></div>
                     </div>
-                    <div>
-                        <div class="flex justify-between text-[10px] font-mono text-slate-400"><span>7D</span><span id="ana-week" class="text-white">0</span></div>
+                    <div class="prog-box">
+                        <div class="flex justify-between text-xs font-mono text-slate-300 mb-1"><span>7D CYCLE</span><span id="ana-week" class="font-bold text-white">0</span></div>
                         <div class="prog-bg"><div class="prog-fill" id="bar-week" style="width: 0%"></div></div>
                     </div>
-                    <div class="col-span-2">
-                        <div class="flex justify-between text-[10px] font-mono text-slate-400"><span>30D</span><span id="ana-month" class="text-white">0</span></div>
+                    <div class="prog-box">
+                        <div class="flex justify-between text-xs font-mono text-slate-300 mb-1"><span>30D CYCLE</span><span id="ana-month" class="font-bold text-white">0</span></div>
                         <div class="prog-bg"><div class="prog-fill" id="bar-month" style="width: 0%"></div></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Client Agents Scrollable -->
-            <div class="glass-panel flex flex-col flex-1 min-h-[180px]">
-                <div class="p-3 border-b border-white/10 flex justify-between items-center bg-white/5">
-                    <h3 class="text-xs font-bold tracking-wider">CLIENT AGENTS</h3>
-                    <button onclick="showClientModal()" class="w-5 h-5 rounded bg-[#00ffd6]/20 text-[#00ffd6] flex items-center justify-center hover:bg-[#00ffd6] hover:text-black transition-colors">+</button>
-                </div>
-                <div class="scrollable-panel p-2 flex flex-col gap-2" id="client-keys-grid">
-                    <!-- Client Cards Inject -->
-                </div>
-            </div>
-        </div>
-
-        <!-- CENTER COLUMN: Upstream Keys -->
-        <div class="bento-col">
-            <div class="glass-panel p-4 flex justify-between items-center shrink-0">
-                <h2 class="text-lg font-bold tracking-wider flex items-center gap-2">
-                    <svg class="w-5 h-5 text-[#00ffd6]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
-                    UPSTREAM NODES
-                </h2>
-                <button onclick="showAddModal()" class="ciel-btn primary text-xs !py-1.5">+ ADD NODE</button>
+            <!-- Upstream Keys 3D Grid -->
+            <div class="flex flex-wrap gap-8 justify-center mt-4" id="keys-grid">
+                <!-- 3D Cards Inject Here -->
             </div>
             
-            <div class="scrollable-panel">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3" id="keys-grid">
-                    <!-- 3D Upstream Cards Inject -->
+            <div class="mt-8 text-center text-xs text-slate-500 font-mono tracking-widest uppercase pb-10">End of Node List</div>
+
+        </div> <!-- End Layout -->
+
+        <!-- Fixed Terminal Footer -->
+        <div class="terminal-panel flex flex-col">
+            <div class="p-3 border-b border-white/10 bg-black/60 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="ml-3 text-xs font-mono text-[#00ffd6] tracking-widest">SYS_CONSOLE</span>
                 </div>
+                <button onclick="switchTab('clients')" class="ciel-btn !py-1 !px-3 !text-[10px]">VIEW AGENTS</button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 font-mono text-[13px] text-[#00ffd6] leading-relaxed break-words" id="console-output">
+                <!-- Logs Inject -->
             </div>
         </div>
 
-        <!-- RIGHT COLUMN: System Terminal -->
-        <div class="bento-col terminal-col">
-            <div class="glass-panel flex flex-col h-full border border-slate-700 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
-                <div class="p-3 border-b border-white/10 bg-black/40 flex items-center gap-2 shrink-0">
-                    <div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                    <div class="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
-                    <div class="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-                    <span class="ml-2 text-[10px] font-mono text-slate-400 uppercase tracking-widest">system_terminal</span>
-                </div>
-                <div class="scrollable-panel p-4 bg-black/60 font-mono text-[11px] text-[#00ffd6] leading-relaxed break-words" id="console-output">
-                    <!-- Logs Inject -->
-                </div>
-            </div>
-        </div>
-
-    </main>
+    </div> <!-- End Main Wrapper -->
 
     <!-- Modals -->
     <div id="add-modal" class="overlay hide">
-        <div class="glass-panel p-6 w-full max-w-sm mx-4">
-            <h2 class="text-lg font-bold mb-4 text-white">REGISTER UPSTREAM NODE</h2>
-            <input type="text" id="new-key" placeholder="API Key (sk-...)" class="ciel-input w-full mb-3">
-            <input type="number" id="new-priority" value="0" placeholder="Priority (High = First)" class="ciel-input w-full mb-6">
-            <div class="flex gap-2">
+        <div class="glass-panel p-8 w-full max-w-md mx-4">
+            <h2 class="text-xl font-bold mb-6 text-white text-center">REGISTER NODE</h2>
+            <input type="text" id="new-key" placeholder="API Key (sk-...)" class="ciel-input w-full mb-4">
+            <input type="number" id="new-priority" value="0" placeholder="Priority (High = First)" class="ciel-input w-full mb-8">
+            <div class="flex gap-4">
                 <button onclick="hideAddModal()" class="ciel-btn flex-1">CANCEL</button>
                 <button onclick="addKey()" class="ciel-btn primary flex-1">EXECUTE</button>
             </div>
@@ -352,35 +382,48 @@
     </div>
     
     <div id="client-modal" class="overlay hide">
-        <div class="glass-panel p-6 w-full max-w-sm mx-4">
-            <h2 class="text-lg font-bold mb-4 text-white">GENERATE AGENT KEY</h2>
-            <input type="text" id="new-client-name" placeholder="Agent ID (e.g. Hermes)" class="ciel-input w-full mb-6">
-            <div class="flex gap-2">
+        <div class="glass-panel p-8 w-full max-w-md mx-4">
+            <h2 class="text-xl font-bold mb-6 text-white text-center">GENERATE AGENT KEY</h2>
+            <input type="text" id="new-client-name" placeholder="Agent ID (e.g. Hermes)" class="ciel-input w-full mb-8">
+            <div class="flex gap-4">
                 <button onclick="hideClientModal()" class="ciel-btn flex-1">CANCEL</button>
                 <button onclick="addClientKey()" class="ciel-btn primary flex-1">GENERATE</button>
             </div>
         </div>
     </div>
 
+    <!-- Client Agents List Modal (Triggered from Terminal header) -->
+    <div id="client-list-modal" class="overlay hide">
+        <div class="glass-panel p-6 w-full max-w-3xl mx-4 max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-6 shrink-0">
+                <h2 class="text-xl font-bold text-white">CLIENT AGENTS</h2>
+                <button onclick="document.getElementById('client-list-modal').classList.add('hide')" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-4" id="client-keys-grid">
+                <!-- Client list injected -->
+            </div>
+        </div>
+    </div>
+
     <div id="password-modal" class="overlay hide">
-        <div class="glass-panel p-6 w-full max-w-sm mx-4">
-            <h2 class="text-lg font-bold mb-4 text-white">SYSTEM PASSWORD</h2>
-            <input type="password" id="new-password" placeholder="New Pin" class="ciel-input w-full mb-6 focus:!border-red-400">
-            <div class="flex gap-2">
+        <div class="glass-panel p-8 w-full max-w-md mx-4">
+            <h2 class="text-xl font-bold mb-6 text-white text-center">SYSTEM OVERRIDE</h2>
+            <input type="password" id="new-password" placeholder="New Access Pin" class="ciel-input w-full mb-8 focus:!border-red-400">
+            <div class="flex gap-4">
                 <button onclick="hidePasswordModal()" class="ciel-btn flex-1">CANCEL</button>
-                <button onclick="changePassword()" class="ciel-btn danger flex-1 !text-red-400 !border-red-400">OVERRIDE</button>
+                <button onclick="changePassword()" class="ciel-btn !border-red-500 !text-red-400 hover:!bg-red-500 hover:!text-white flex-1">UPDATE</button>
             </div>
         </div>
     </div>
 
     <div id="new-client-key-modal" class="overlay hide">
-        <div class="glass-panel p-6 w-full max-w-sm mx-4 border border-[#00ffd6]">
-            <h2 class="text-lg font-bold mb-2 text-[#00ffd6]">AGENT INITIALIZED</h2>
-            <p class="text-[10px] text-red-400 font-mono mb-4">CRITICAL: COPY TOKEN NOW. NO RECOVERY.</p>
-            <div class="flex items-center gap-2 mb-6">
-                <input type="text" id="display-new-client-key" readonly class="ciel-input flex-1 text-center text-[#00ffd6]">
-                <button onclick="copyToClipboard('display-new-client-key')" class="ciel-btn" title="Copy">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+        <div class="glass-panel p-8 w-full max-w-md mx-4 border border-[#00ffd6]">
+            <h2 class="text-xl font-bold mb-2 text-[#00ffd6] text-center">AGENT INITIALIZED</h2>
+            <p class="text-[12px] text-red-400 font-mono mb-6 text-center">CRITICAL: COPY TOKEN NOW. NO RECOVERY.</p>
+            <div class="flex items-center gap-2 mb-8">
+                <input type="text" id="display-new-client-key" readonly class="ciel-input flex-1 text-center text-[#00ffd6] text-lg font-bold">
+                <button onclick="copyToClipboard('display-new-client-key')" class="ciel-btn primary" title="Copy">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                 </button>
             </div>
             <button onclick="closeNewClientKeyModal()" class="ciel-btn w-full">ACKNOWLEDGE</button>
@@ -397,10 +440,10 @@
             const toast = document.createElement('div');
             toast.className = `toast ${type === 'error' ? 'error' : ''}`;
             toast.innerHTML = `
-                <svg class="w-4 h-4 shrink-0 ${type === 'error' ? 'text-red-500' : 'text-[#00ffd6]'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 shrink-0 ${type === 'error' ? 'text-red-500' : 'text-[#00ffd6]'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     ${type === 'error' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>' : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>'}
                 </svg>
-                <span class="font-mono text-xs tracking-wider">${message}</span>
+                <span>${message}</span>
             `;
             container.appendChild(toast);
             setTimeout(() => toast.classList.add('show'), 10);
@@ -412,46 +455,34 @@
 
         function toggleMenu() {
             const menu = document.getElementById('dropdown-menu');
-            if (menu.classList.contains('hide')) {
-                menu.classList.remove('hide');
-                menu.style.display = 'flex';
-            } else {
-                menu.classList.add('hide');
-                menu.style.display = 'none';
-            }
+            if (menu.classList.contains('hide')) { menu.classList.remove('hide'); } 
+            else { menu.classList.add('hide'); }
         }
 
         document.addEventListener('click', (e) => {
             const menu = document.getElementById('dropdown-menu');
-            if(!menu.classList.contains('hide') && !e.target.closest('.relative')) {
-                menu.classList.add('hide');
-                menu.style.display = 'none';
-            }
+            if(!menu.classList.contains('hide') && !e.target.closest('.relative')) { menu.classList.add('hide'); }
         });
 
-        function copyText(text) {
-            navigator.clipboard.writeText(text).then(() => showToast('TOKEN_COPIED')).catch(() => showToast('COPY_FAILED', 'error'));
-        }
+        function copyText(text) { navigator.clipboard.writeText(text).then(() => showToast('COPIED TO CLIPBOARD')).catch(() => showToast('COPY FAILED', 'error')); }
         function copyToClipboard(elementId) { copyText(document.getElementById(elementId).value); }
 
         window.onload = async () => {
             if (sessionToken) {
                 try {
                     const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                    if (res.ok) showDashboard();
-                    else logout();
+                    if (res.ok) showDashboard(); else logout();
                 } catch (e) { logout(); }
             }
         };
 
         function showDashboard() {
             document.getElementById('login-overlay').classList.add('hide');
-            const dash = document.getElementById('dashboard');
-            dash.classList.remove('hide');
-            setTimeout(() => dash.classList.remove('opacity-0'), 50);
+            const wrapper = document.getElementById('main-wrapper');
+            wrapper.classList.remove('hide');
+            setTimeout(() => wrapper.classList.remove('opacity-0'), 50);
             refreshAll();
             startLogPolling();
-            showToast('SYS_AUTH_SUCCESS');
         }
 
         async function login() {
@@ -466,17 +497,18 @@
                     sessionToken = data.token;
                     localStorage.setItem('ciel_session', sessionToken);
                     showDashboard();
-                } else showToast('AUTH_REJECTED', 'error');
-            } catch (e) { showToast('NETWORK_ERROR', 'error'); }
+                    showToast('SYSTEM UNLOCKED');
+                } else showToast('AUTH REJECTED', 'error');
+            } catch (e) { showToast('NETWORK ERROR', 'error'); }
         }
 
         function logout() {
             sessionToken = ''; localStorage.removeItem('ciel_session');
             if(logInterval) clearInterval(logInterval);
-            document.getElementById('dashboard').classList.add('hide', 'opacity-0');
+            document.getElementById('main-wrapper').classList.add('hide', 'opacity-0');
             document.getElementById('login-overlay').classList.remove('hide');
             document.getElementById('pin-input').value = '';
-            showToast('SESSION_TERMINATED');
+            showToast('LOGGED OUT');
         }
 
         function refreshAll() { refreshData(); refreshClientKeys(); refreshAnalytics(); }
@@ -512,50 +544,55 @@
                     const isHealthy = k.balance > 0;
                     if(isHealthy) active++;
                     total += (isHealthy ? k.balance : 0);
-                    
+                    const isPri = k.priority > 0;
                     const idPrefix = `key-${index}`;
+                    
                     grid.innerHTML += `
-                        <div class="glass-panel card-3d p-3 flex flex-col justify-between ${!isHealthy ? 'dead' : ''}">
-                            <div class="flex justify-between items-start mb-2">
-                                <div class="flex items-center gap-1.5">
-                                    <div class="w-1.5 h-1.5 rounded-full ${isHealthy ? 'bg-[#00ffd6] shadow-[0_0_4px_#00ffd6]' : 'bg-red-500'}"></div>
-                                    <span class="text-[10px] font-mono text-slate-300">NODE_${index < 10 ? '0'+index : index} ${k.priority > 0 ? '(PRIORITY)' : ''}</span>
+                        <div class="parent-3d">
+                            <div class="card-3d ${!isHealthy ? 'dead' : ''} ${isPri && isHealthy ? 'priority' : ''}">
+                                <div class="card-glass"></div>
+                                <div class="card-content">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <div class="w-3 h-3 rounded-full ${isHealthy ? 'bg-[#00ffd6] shadow-[0_0_8px_#00ffd6]' : 'bg-red-500'}"></div>
+                                        <span class="card-title !mb-0 !text-[22px] !text-${isPri ? 'white' : '[#0f172a]'}">NODE_${index < 10 ? '0'+index : index}</span>
+                                    </div>
+                                    <span class="card-text !text-${isPri ? 'slate-200' : 'slate-800'} mt-2 flex items-center gap-2">
+                                        ${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}
+                                        <svg onclick="copyText('${k.key}')" class="w-4 h-4 cursor-pointer hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                    </span>
+                                    <div class="mt-4">
+                                        <div class="text-xs font-mono !text-${isPri ? 'slate-300' : 'slate-600'}">BALANCE</div>
+                                        <div class="text-3xl font-bold font-mono !text-${isPri ? 'white' : 'black'}" id="bal-${idPrefix}">${k.balance.toFixed(2)}</div>
+                                    </div>
                                 </div>
-                                <div class="flex gap-1">
-                                    <button onclick="copyText('${k.key}')" class="text-slate-400 hover:text-white transition-colors" title="Copy"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
-                                    <button onclick="testKeyInline('${k.key}', 'bal-${idPrefix}')" class="text-slate-400 hover:text-[#00ffd6] transition-colors" title="Verify"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></button>
-                                    <button onclick="deleteKey('${k.key}')" class="text-slate-400 hover:text-red-400 transition-colors" title="Purge"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                                <div class="card-bottom">
+                                    <button onclick="testKeyInline('${k.key}', 'bal-${idPrefix}')" class="card-btn">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                        VERIFY
+                                    </button>
+                                    <button onclick="deleteKey('${k.key}')" class="card-btn danger">
+                                        PURGE
+                                    </button>
                                 </div>
-                            </div>
-                            <div class="font-mono text-xs text-slate-200 truncate mb-2 opacity-70">${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}</div>
-                            <div class="mt-auto">
-                                <p class="text-[9px] font-mono text-slate-500 mb-0.5">BALANCE</p>
-                                <p class="font-mono font-bold text-lg leading-none ${isHealthy ? 'text-white' : 'text-red-400'}" id="bal-${idPrefix}">${k.balance.toFixed(4)}</p>
                             </div>
                         </div>
                     `;
                 });
                 document.getElementById('stat-active-keys').innerText = active;
-                document.getElementById('stat-total-pollen').innerText = total.toFixed(4);
+                document.getElementById('stat-total-pollen').innerText = total.toFixed(2);
             } catch(e) {}
         }
 
         async function testKeyInline(key, elementId) {
             const el = document.getElementById(elementId);
-            const originalText = el.innerText;
-            el.innerText = 'SYNC...'; el.classList.add('animate-pulse', 'text-[#00ffd6]');
+            const orig = el.innerText;
+            el.innerText = 'SYNC..'; 
             try {
                 const res = await fetch(`/admin/test/${key}`, { headers: { 'Authorization': `Bearer ${sessionToken}` }});
                 const data = await res.json();
-                el.classList.remove('animate-pulse');
-                if (data.success) {
-                    el.innerText = data.balance.toFixed(4); el.classList.replace('text-[#00ffd6]', 'text-white');
-                    showToast('VERIFICATION_COMPLETE'); refreshAll();
-                } else {
-                    el.innerText = '0.0000'; el.classList.replace('text-[#00ffd6]', 'text-red-400');
-                    showToast('NODE_DEPLETED', 'error');
-                }
-            } catch (err) { el.classList.remove('animate-pulse'); el.innerText = originalText; showToast('NETWORK_ERROR', 'error'); }
+                if (data.success) { el.innerText = data.balance.toFixed(2); showToast('VERIFIED'); refreshAll(); }
+                else { el.innerText = '0.00'; showToast('DEAD', 'error'); }
+            } catch (err) { el.innerText = orig; showToast('ERR', 'error'); }
         }
 
         async function refreshClientKeys() {
@@ -566,17 +603,15 @@
                 grid.innerHTML = '';
                 data.keys.forEach(k => {
                     grid.innerHTML += `
-                        <div class="p-2 bg-white/5 rounded-lg border border-white/5 hover:border-[#00ffd6]/30 transition-colors flex items-center justify-between group">
-                            <div class="overflow-hidden pr-2">
-                                <h4 class="text-xs font-bold tracking-wide truncate">${k.name}</h4>
-                                <div class="flex items-center gap-1 mt-1">
-                                    <span class="text-[10px] font-mono text-[#00ffd6] opacity-80">${k.key.substring(0,8)}...${k.key.substring(k.key.length-4)}</span>
-                                    <svg onclick="copyText('${k.key}')" class="w-3 h-3 text-slate-500 hover:text-[#00ffd6] cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                                </div>
+                        <div class="glass-panel p-4 flex items-center justify-between border-l-4 border-[#00ffd6]">
+                            <div>
+                                <h4 class="font-bold tracking-wider">${k.name}</h4>
+                                <div class="font-mono text-sm text-slate-400 mt-1">${k.key.substring(0,8)}...${k.key.substring(k.key.length-4)}</div>
                             </div>
-                            <button onclick="deleteClientKey('${k.key}')" class="w-6 h-6 rounded bg-red-500/10 text-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white shrink-0">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                            </button>
+                            <div class="flex gap-2">
+                                <button onclick="copyText('${k.key}')" class="ciel-btn !p-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
+                                <button onclick="deleteClientKey('${k.key}')" class="ciel-btn danger !p-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                            </div>
                         </div>
                     `;
                 });
@@ -599,6 +634,7 @@
 
         function showAddModal() { document.getElementById('add-modal').classList.remove('hide'); }
         function hideAddModal() { document.getElementById('add-modal').classList.add('hide'); document.getElementById('new-key').value=''; }
+        function switchTab(tab) { if(tab==='clients') document.getElementById('client-list-modal').classList.remove('hide'); }
         function showClientModal() { document.getElementById('client-modal').classList.remove('hide'); }
         function hideClientModal() { document.getElementById('client-modal').classList.add('hide'); document.getElementById('new-client-name').value=''; }
         function showPasswordModal() { document.getElementById('password-modal').classList.remove('hide'); }
@@ -608,37 +644,37 @@
         async function addKey() {
             const key = document.getElementById('new-key').value;
             const priority = document.getElementById('new-priority').value;
-            if(!key) return showToast('KEY_REQUIRED', 'error');
-            await fetch('/admin/keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ key, priority: parseInt(priority) }) });
-            hideAddModal(); refreshData(); showToast('NODE_ADDED');
+            if(!key) return showToast('KEY REQUIRED', 'error');
+            await fetch('/admin/keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ key, priority: parseInt(prio) }) });
+            hideAddModal(); refreshData(); showToast('NODE ADDED');
         }
         async function deleteKey(key) {
             if(!confirm('PURGE NODE?')) return;
             await fetch(`/admin/keys/${key}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` }});
-            refreshData(); showToast('NODE_PURGED');
+            refreshData(); showToast('NODE PURGED');
         }
         async function addClientKey() {
             const name = document.getElementById('new-client-name').value;
-            if(!name) return showToast('AGENT_ID_REQUIRED', 'error');
+            if(!name) return showToast('NAME REQUIRED', 'error');
             const res = await fetch('/admin/client-keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ name }) });
             if(res.ok) {
                 const data = await res.json();
                 hideClientModal();
                 document.getElementById('display-new-client-key').value = data.key;
                 document.getElementById('new-client-key-modal').classList.remove('hide');
-                refreshClientKeys(); showToast('AGENT_INIT');
+                refreshClientKeys(); showToast('AGENT ADDED');
             }
         }
         async function deleteClientKey(key) {
             if(!confirm('CRITICAL: PURGE AGENT?')) return;
             await fetch(`/admin/client-keys/${key}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` }});
-            refreshClientKeys(); showToast('AGENT_PURGED');
+            refreshClientKeys(); showToast('AGENT PURGED');
         }
         async function changePassword() {
             const np = document.getElementById('new-password').value;
-            if(!np) return showToast('REQ_PASS', 'error');
+            if(!np) return showToast('PASS REQUIRED', 'error');
             const res = await fetch('/admin/password', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({new_password:np}) });
-            if(res.ok) { showToast('PASS_UPDATED'); hidePasswordModal(); }
+            if(res.ok) { showToast('PASS UPDATED'); hidePasswordModal(); }
         }
     </script>
 </body>
