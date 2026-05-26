@@ -451,9 +451,8 @@ async def smart_proxy(request: Request, path: str):
     except:
         is_stream = False
     
-    # If we are starting with NO keys, we MUST use SSE for the waiting keep-alive pings
-    no_keys = (await key_manager.get_best_key()) is None
-    media_type = "text/event-stream" if (is_stream or no_keys) else "application/json"
+    # Determine media type: strictly respect the client's request
+    media_type = "text/event-stream" if is_stream else "application/json"
 
     return StreamingResponse(generate_with_keepalive(), status_code=200, media_type=media_type)
 
