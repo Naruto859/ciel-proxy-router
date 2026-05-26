@@ -2,355 +2,192 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CIEL | Advanced Gateway Command</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CIEL | Micro-OS</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --glass-bg: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --neon-cyan: #00ffd6;
-            --neon-violet: #8b5cf6;
+            --cyan: #00ffd6;
+            --bg: #030507;
+            --panel: #0a0e14;
+            --border: #1a2333;
         }
 
-        body {
-            font-family: 'Outfit', sans-serif;
-            background-color: #0b0914;
-            color: white;
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            overflow: hidden; /* Desktop is entirely single screen */
-        }
-
-        /* Animated Liquid Background */
-        .liquid-bg {
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            z-index: -2;
-            background: linear-gradient(135deg, #090614 0%, #171030 50%, #051421 100%);
-        }
-        .liquid-blob {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(80px);
-            z-index: -1;
-            animation: float 20s infinite alternate ease-in-out;
-            opacity: 0.6;
-        }
-        .blob-1 { width: 50vw; height: 50vw; background: rgba(0, 255, 214, 0.15); top: -10%; left: -10%; }
-        .blob-2 { width: 40vw; height: 40vw; background: rgba(139, 92, 246, 0.15); bottom: -10%; right: -10%; animation-delay: -5s; }
-
-        @keyframes float {
-            0% { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(10%, 10%) scale(1.1); }
-        }
-
-        /* Premium Glassmorphism */
-        .glass-panel {
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-            position: relative;
+        /* Strict NO-SCROLL Body */
+        body, html {
+            margin: 0; padding: 0;
+            width: 100vw; height: 100vh;
             overflow: hidden;
+            background-color: var(--bg);
+            color: #fff;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* Glowing AI Core Logo */
-        .ai-core {
-            position: relative;
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #ffffff 0%, var(--neon-cyan) 30%, transparent 80%);
-            box-shadow: inset 0 0 20px rgba(255,255,255,0.8), 0 0 20px var(--neon-cyan);
-            border: 1px solid rgba(255,255,255,0.5);
-            backdrop-filter: blur(5px);
-            animation: core-breathe 4s infinite alternate ease-in-out;
-        }
-        .ai-core::after {
-            content: '';
-            position: absolute;
-            top: -4px; left: -4px; right: -4px; bottom: -4px;
-            border-radius: 50%;
-            border: 1px solid var(--neon-cyan);
-            border-left-color: transparent;
-            animation: spin 3s linear infinite;
-            opacity: 0.7;
-        }
-        @keyframes core-breathe {
-            0% { box-shadow: inset 0 0 10px rgba(255,255,255,0.5), 0 0 15px var(--neon-cyan); transform: scale(0.95); }
-            100% { box-shadow: inset 0 0 25px rgba(255,255,255,1), 0 0 35px var(--neon-cyan), 0 0 50px rgba(0,255,214,0.4); transform: scale(1.05); }
-        }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
+        /* Scrollbars (Hidden or Micro) */
+        ::-webkit-scrollbar { width: 2px; height: 2px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 255, 214, 0.3); border-radius: 2px; }
 
-        /* Bento Box Grid */
-        .bento-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 1rem;
-            height: 100%;
-            padding: 1rem;
-            overflow-y: auto;
-        }
-        @media (min-width: 1024px) {
-            body { overflow: hidden; }
-            .bento-grid {
-                grid-template-columns: 320px 1fr 350px;
-                grid-template-rows: 100%;
-                overflow: hidden;
-            }
-            .bento-col {
-                display: flex;
-                flex-direction: column;
-                gap: 1rem;
-                height: 100%;
-                overflow: hidden;
-            }
-            .scrollable-panel {
-                flex: 1;
-                overflow-y: auto;
-                padding-right: 4px;
-            }
-        }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
-
-        /* 3D Compact Card */
-        .card-3d {
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            transform-style: preserve-3d;
-            border-left: 3px solid var(--neon-cyan);
-            background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
-        }
-        .card-3d:hover {
-            transform: translateY(-3px) scale(1.01) rotateX(2deg);
-            box-shadow: 0 10px 20px rgba(0, 255, 214, 0.15), 0 4px 6px rgba(0,0,0,0.3);
-            border-left-color: #fff;
-            background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 100%);
-        }
-        .card-3d.dead { border-left-color: #ef4444; }
-
-        /* Progress Bars */
-        .prog-bg { background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; overflow: hidden; margin-top: 4px; }
-        .prog-fill { background: linear-gradient(90deg, var(--neon-violet), var(--neon-cyan)); height: 100%; transition: width 1s ease-out; }
-
-        /* Buttons & Inputs */
-        .ciel-input {
-            background: rgba(0,0,0,0.4);
-            border: 1px solid var(--glass-border);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            outline: none;
-            transition: all 0.2s;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-        }
-        .ciel-input:focus { border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0,255,214,0.2); }
+        /* Micro Components */
+        .top-bar { height: 40px; flex-shrink: 0; border-bottom: 1px solid var(--cyan); display: flex; justify-content: space-between; align-items: center; padding: 0 10px; background: #000; box-shadow: 0 1px 10px rgba(0,255,214,0.1); }
+        .analytics-strip { height: 24px; flex-shrink: 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 10px; background: var(--panel); color: var(--cyan); font-size: 9px; }
+        .client-gen { height: 36px; flex-shrink: 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 10px; gap: 8px; background: #000; }
         
-        .ciel-btn {
-            background: rgba(255,255,255,0.1);
-            border: 1px solid var(--glass-border);
-            color: white;
-            font-weight: 600;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            transition: all 0.2s;
-            cursor: pointer;
-            font-size: 0.85rem;
-            display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
-        }
-        .ciel-btn:hover { background: rgba(0,255,214,0.2); border-color: var(--neon-cyan); color: var(--neon-cyan); }
-        .ciel-btn.primary { background: var(--neon-cyan); color: #000; border-color: var(--neon-cyan); }
-        .ciel-btn.primary:hover { background: #fff; box-shadow: 0 0 15px var(--neon-cyan); }
-        .ciel-btn.danger:hover { background: rgba(239,68,68,0.2); border-color: #ef4444; color: #ef4444; }
-
-        /* Premium Glass Toasts */
-        #toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
-        .toast {
-            background: rgba(10, 15, 30, 0.85); backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border); border-left: 4px solid var(--neon-cyan);
-            color: white; padding: 12px 16px; border-radius: 8px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            font-size: 0.85rem; font-weight: 600;
-            display: flex; align-items: center; gap: 10px;
-            transform: translateX(120%); opacity: 0;
-            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            pointer-events: auto;
-        }
-        .toast.show { transform: translateX(0); opacity: 1; }
-        .toast.error { border-left-color: #ef4444; }
+        /* The ONLY scrollable area */
+        .keys-list-container { flex-grow: 1; overflow-y: auto; overflow-x: hidden; background: var(--bg); position: relative; }
         
+        .list-row { display: flex; align-items: center; justify-content: space-between; height: 40px; border-bottom: 1px solid var(--border); padding: 0 10px; }
+        .list-row:hover { background: rgba(0, 255, 214, 0.05); }
+        
+        /* Mini Terminal */
+        .mini-terminal { height: 25vh; flex-shrink: 0; border-top: 1px solid var(--cyan); background: #010203; overflow-y: auto; padding: 6px; font-size: 9px; color: #4ade80; line-height: 1.3; box-shadow: 0 -2px 10px rgba(0,255,214,0.05); }
+
+        /* Form Elements */
+        input { background: var(--panel); border: 1px solid var(--border); color: var(--cyan); height: 24px; padding: 0 8px; outline: none; border-radius: 3px; font-family: inherit; font-size: 10px; }
+        input:focus { border-color: var(--cyan); }
+        
+        .btn-micro { height: 24px; min-width: 24px; display: inline-flex; align-items: center; justify-content: center; background: var(--panel); border: 1px solid var(--border); color: white; border-radius: 3px; cursor: pointer; }
+        .btn-micro:active { background: var(--cyan); color: #000; }
+        .btn-micro.cyan { background: rgba(0,255,214,0.1); border-color: var(--cyan); color: var(--cyan); }
+        .btn-micro.cyan:active { background: var(--cyan); color: #000; }
+
+        /* Icons */
+        .icon { width: 12px; height: 12px; }
+        .icon-btn { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: #888; cursor: pointer; transition: color 0.2s; }
+        .icon-btn:hover, .icon-btn:active { color: var(--cyan); }
+        .icon-btn.danger:hover, .icon-btn.danger:active { color: #ef4444; }
+
+        /* Overlays & Modals */
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; display: flex; align-items: center; justify-content: center; }
         .hide { display: none !important; }
-        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); z-index: 100; display: flex; align-items: center; justify-content: center; }
+        .modal-box { background: var(--bg); border: 1px solid var(--cyan); padding: 15px; width: 280px; box-shadow: 0 0 20px rgba(0,255,214,0.1); border-radius: 4px; }
+        
+        /* Dropdown */
+        .dropdown { position: absolute; right: 5px; top: 35px; background: var(--panel); border: 1px solid var(--cyan); border-radius: 3px; z-index: 50; flex-direction: column; width: 120px; }
+        .dropdown button { background: none; border: none; color: white; text-align: left; padding: 8px 10px; font-family: inherit; font-size: 10px; width: 100%; border-bottom: 1px solid var(--border); }
+        .dropdown button:last-child { border-bottom: none; }
+        .dropdown button:hover { background: rgba(0,255,214,0.1); color: var(--cyan); }
+
+        /* Toast */
+        #toast { position: fixed; top: 45px; left: 50%; transform: translateX(-50%); background: var(--cyan); color: #000; padding: 4px 10px; border-radius: 20px; font-weight: bold; font-size: 9px; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 9999; }
+        #toast.show { opacity: 1; }
+
+        /* Blink Anim */
+        @keyframes blink { 50% { opacity: 0; } }
+        .blinking { animation: blink 1s infinite; }
     </style>
 </head>
 <body>
-    <div class="liquid-bg">
-        <div class="liquid-blob blob-1"></div>
-        <div class="liquid-blob blob-2"></div>
-    </div>
 
-    <div id="toast-container"></div>
+    <div id="toast"></div>
 
-    <!-- Login Auth -->
+    <!-- Login -->
     <div id="login-overlay" class="overlay">
-        <div class="glass-panel p-8 w-full max-w-sm text-center mx-4">
-            <div class="ai-core mx-auto mb-6"></div>
-            <h1 class="text-2xl font-bold mb-1 tracking-wider text-white">CIEL <span class="text-[#00ffd6]">GATEWAY</span></h1>
-            <p class="text-xs text-slate-400 mb-6 font-mono tracking-widest">AWAITING SYSTEM AUTHORIZATION</p>
-            <input type="password" id="pin-input" placeholder="ACCESS PIN" class="ciel-input w-full text-center text-xl tracking-widest mb-6 py-3" onkeydown="if(event.key==='Enter') login()">
-            <button onclick="login()" class="ciel-btn primary w-full py-3 text-sm tracking-wider">AUTHENTICATE</button>
+        <div class="modal-box text-center">
+            <div class="w-8 h-8 rounded-full border border-[var(--cyan)] mx-auto mb-3 flex items-center justify-center shadow-[0_0_10px_var(--cyan)]">
+                <div class="w-4 h-4 bg-[var(--cyan)] rounded-full"></div>
+            </div>
+            <div class="mb-4 text-[var(--cyan)] tracking-widest text-xs">CIEL SYS_AUTH</div>
+            <input type="password" id="pin-input" placeholder="PASSCODE" class="w-full text-center tracking-widest mb-4" onkeydown="if(event.key==='Enter') login()">
+            <button onclick="login()" class="btn-micro cyan w-full">UNLOCK</button>
         </div>
     </div>
 
-    <!-- Main Bento Dashboard -->
-    <main id="dashboard" class="bento-grid hide opacity-0 transition-opacity duration-700">
+    <!-- MAIN APP -->
+    <div id="app" class="hide flex flex-col h-full w-full">
         
-        <!-- LEFT COLUMN: Identity, Stats, Clients -->
-        <div class="bento-col lg:w-80">
-            <!-- Header Identity -->
-            <div class="glass-panel p-5 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="ai-core" style="width: 40px; height: 40px;"></div>
-                    <div>
-                        <h1 class="text-xl font-bold leading-tight">CIEL</h1>
-                        <p class="text-[10px] font-mono text-[#00ffd6] tracking-widest">SYSTEM ONLINE</p>
-                    </div>
-                </div>
-                <div class="flex gap-2">
-                    <button onclick="refreshAll()" class="p-2 bg-white/5 hover:bg-[#00ffd6]/20 rounded-lg text-white hover:text-[#00ffd6] transition-colors" title="Sync">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    </button>
-                    <button onclick="logout()" class="p-2 bg-white/5 hover:bg-red-500/20 rounded-lg text-white hover:text-red-400 transition-colors" title="Logout">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                    </button>
-                </div>
+        <!-- 1. Top Bar -->
+        <div class="top-bar">
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 bg-[var(--cyan)] rounded-full shadow-[0_0_5px_var(--cyan)]"></div>
+                <span class="font-bold tracking-widest text-[var(--cyan)]">CIEL</span>
             </div>
-
-            <!-- Global Balance -->
-            <div class="glass-panel p-5">
-                <p class="text-[10px] font-mono text-slate-400 mb-1">TOTAL UPSTREAM BALANCE</p>
-                <div class="flex items-baseline gap-2">
-                    <h2 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-[#00ffd6]" id="stat-total-pollen">0.00</h2>
-                    <span class="text-sm font-mono text-[#00ffd6]">P</span>
+            <div class="flex items-center gap-3">
+                <div class="text-right">
+                    <div class="text-[8px] text-gray-500 leading-none">TOTAL BALANCE</div>
+                    <div class="text-[var(--cyan)] font-bold"><span id="stat-total-pollen">0.000</span> P</div>
                 </div>
-                <div class="mt-2 flex items-center gap-2 text-xs font-mono text-slate-300">
-                    <div class="w-2 h-2 bg-[#00ffd6] rounded-full shadow-[0_0_5px_#00ffd6]"></div>
-                    <span id="stat-active-keys" class="font-bold text-white">0</span> ACTIVE NODES
+                <div class="icon-btn" onclick="refreshAll()" title="Refresh">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                 </div>
-            </div>
-
-            <!-- Analytics Bento -->
-            <div class="glass-panel p-5">
-                <div class="flex items-center gap-2 mb-4">
-                    <svg class="w-4 h-4 text-[#8b5cf6]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                    <h3 class="text-sm font-bold tracking-wider">USAGE TRAFFIC</h3>
+                <div class="icon-btn" onclick="toggleMenu()">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <div class="flex justify-between text-[10px] font-mono text-slate-400"><span>24H</span><span id="ana-today" class="text-white">0</span></div>
-                        <div class="prog-bg"><div class="prog-fill" id="bar-today" style="width: 0%"></div></div>
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-[10px] font-mono text-slate-400"><span>7D</span><span id="ana-week" class="text-white">0</span></div>
-                        <div class="prog-bg"><div class="prog-fill" id="bar-week" style="width: 0%"></div></div>
-                    </div>
-                    <div class="col-span-2">
-                        <div class="flex justify-between text-[10px] font-mono text-slate-400"><span>30D</span><span id="ana-month" class="text-white">0</span></div>
-                        <div class="prog-bg"><div class="prog-fill" id="bar-month" style="width: 0%"></div></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Client Agents Scrollable -->
-            <div class="glass-panel flex flex-col flex-1 min-h-[200px]">
-                <div class="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
-                    <h3 class="text-sm font-bold tracking-wider">CLIENT AGENTS</h3>
-                    <button onclick="showClientModal()" class="w-6 h-6 rounded bg-[#00ffd6]/20 text-[#00ffd6] flex items-center justify-center hover:bg-[#00ffd6] hover:text-black transition-colors">+</button>
-                </div>
-                <div class="scrollable-panel p-2 flex flex-col gap-2" id="client-keys-grid">
-                    <!-- Client Cards Inject -->
-                </div>
-            </div>
-        </div>
-
-        <!-- CENTER COLUMN: Upstream Keys -->
-        <div class="bento-col">
-            <div class="glass-panel p-4 flex justify-between items-center shrink-0">
-                <h2 class="text-lg font-bold tracking-wider flex items-center gap-2">
-                    <svg class="w-5 h-5 text-[#00ffd6]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
-                    UPSTREAM NODES
-                </h2>
-                <button onclick="showAddModal()" class="ciel-btn primary text-xs !py-1.5">+ ADD NODE</button>
             </div>
             
-            <div class="scrollable-panel">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3" id="keys-grid">
-                    <!-- 3D Upstream Cards Inject -->
-                </div>
+            <div id="dropdown-menu" class="dropdown hide">
+                <button onclick="showAddModal(); toggleMenu()">+ Add Node</button>
+                <button onclick="showPasswordModal(); toggleMenu()">Change Pass</button>
+                <button onclick="logout()" class="text-red-400">Logout</button>
             </div>
         </div>
 
-        <!-- RIGHT COLUMN: System Terminal -->
-        <div class="bento-col lg:w-80">
-            <div class="glass-panel flex flex-col h-full border border-slate-700 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
-                <div class="p-3 border-b border-white/10 bg-black/40 flex items-center gap-2 shrink-0">
-                    <div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                    <div class="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
-                    <div class="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-                    <span class="ml-2 text-[10px] font-mono text-slate-400 uppercase tracking-widest">system_terminal</span>
-                </div>
-                <div class="scrollable-panel p-4 bg-black/60 font-mono text-[11px] text-[#00ffd6] leading-relaxed break-words" id="console-output">
-                    <!-- Logs Inject -->
-                </div>
-            </div>
+        <!-- 2. Analytics Strip -->
+        <div class="analytics-strip">
+            <div>24H: <span id="ana-today" class="text-white">0</span></div>
+            <div>7D: <span id="ana-week" class="text-white">0</span></div>
+            <div>30D: <span id="ana-month" class="text-white">0</span></div>
+            <div>ACT: <span id="stat-active-keys" class="text-white">0</span></div>
         </div>
-    </main>
+
+        <!-- 3. Client Gen -->
+        <div class="client-gen">
+            <span class="text-gray-500 text-[9px] w-12 shrink-0">AGENT_ID</span>
+            <input type="text" id="new-client-name" placeholder="Name..." class="flex-1">
+            <button onclick="addClientKey()" class="btn-micro cyan">+</button>
+        </div>
+
+        <!-- 4. Upstream Keys List (Scrollable) -->
+        <div class="keys-list-container" id="keys-list">
+            <!-- Rows injected here -->
+        </div>
+
+        <!-- 5. Mini Terminal (Fixed 25% Bottom) -->
+        <div class="mini-terminal" id="console-output">
+            <!-- Logs -->
+        </div>
+
+    </div> <!-- End App -->
 
     <!-- Modals -->
     <div id="add-modal" class="overlay hide">
-        <div class="glass-panel p-6 w-full max-w-sm mx-4">
-            <h2 class="text-lg font-bold mb-4 text-white">REGISTER UPSTREAM NODE</h2>
-            <input type="text" id="new-key" placeholder="API Key (sk-...)" class="ciel-input w-full mb-3">
-            <input type="number" id="new-priority" value="0" placeholder="Priority (High = First)" class="ciel-input w-full mb-6">
+        <div class="modal-box">
+            <div class="text-[var(--cyan)] mb-2">ADD UPSTREAM NODE</div>
+            <input type="text" id="new-key" placeholder="sk-..." class="w-full mb-2">
+            <div class="flex gap-2 mb-3">
+                <span class="text-[9px] text-gray-400 leading-[24px]">PRIORITY:</span>
+                <input type="number" id="new-priority" value="0" class="flex-1">
+            </div>
             <div class="flex gap-2">
-                <button onclick="hideAddModal()" class="ciel-btn flex-1">CANCEL</button>
-                <button onclick="addKey()" class="ciel-btn primary flex-1">EXECUTE</button>
+                <button onclick="hideAddModal()" class="btn-micro flex-1">CANCEL</button>
+                <button onclick="addKey()" class="btn-micro cyan flex-1">SAVE</button>
             </div>
         </div>
     </div>
-    
-    <div id="client-modal" class="overlay hide">
-        <div class="glass-panel p-6 w-full max-w-sm mx-4">
-            <h2 class="text-lg font-bold mb-4 text-white">GENERATE AGENT KEY</h2>
-            <input type="text" id="new-client-name" placeholder="Agent ID (e.g. Hermes)" class="ciel-input w-full mb-6">
+
+    <div id="password-modal" class="overlay hide">
+        <div class="modal-box">
+            <div class="text-red-400 mb-2">SYS_PASS OVERRIDE</div>
+            <input type="password" id="new-password" placeholder="NEW PIN" class="w-full mb-4">
             <div class="flex gap-2">
-                <button onclick="hideClientModal()" class="ciel-btn flex-1">CANCEL</button>
-                <button onclick="addClientKey()" class="ciel-btn primary flex-1">GENERATE</button>
+                <button onclick="hidePasswordModal()" class="btn-micro flex-1">CANCEL</button>
+                <button onclick="changePassword()" class="btn-micro flex-1 !border-red-400 !text-red-400">UPDATE</button>
             </div>
         </div>
     </div>
 
     <div id="new-client-key-modal" class="overlay hide">
-        <div class="glass-panel p-6 w-full max-w-sm mx-4 border border-[#00ffd6]">
-            <h2 class="text-lg font-bold mb-2 text-[#00ffd6]">AGENT INITIALIZED</h2>
-            <p class="text-[10px] text-red-400 font-mono mb-4">CRITICAL: COPY TOKEN NOW. DATA WILL PURGE ON CLOSE.</p>
-            <div class="flex items-center gap-2 mb-6">
-                <input type="text" id="display-new-client-key" readonly class="ciel-input flex-1 text-center text-[#00ffd6]">
-                <button onclick="copyToClipboard('display-new-client-key')" class="ciel-btn" title="Copy">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                </button>
+        <div class="modal-box !border-[#00ffd6]">
+            <div class="text-[#00ffd6] mb-1">AGENT KEY GENERATED</div>
+            <div class="text-[8px] text-red-400 mb-2">COPY NOW. NO RECOVERY.</div>
+            <input type="text" id="display-new-client-key" readonly class="w-full mb-3 text-center !text-[#00ffd6]">
+            <div class="flex gap-2">
+                <button onclick="copyToClipboard('display-new-client-key')" class="btn-micro cyan flex-1">COPY</button>
+                <button onclick="closeNewClientKeyModal()" class="btn-micro flex-1">DONE</button>
             </div>
-            <button onclick="closeNewClientKeyModal()" class="ciel-btn w-full">ACKNOWLEDGE</button>
         </div>
     </div>
 
@@ -358,227 +195,205 @@
         let sessionToken = localStorage.getItem('ciel_session') || '';
         let logInterval = null;
 
-        // Custom Toasts
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type === 'error' ? 'error' : ''}`;
-            toast.innerHTML = `
-                <svg class="w-4 h-4 shrink-0 ${type === 'error' ? 'text-red-500' : 'text-[#00ffd6]'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    ${type === 'error' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>' : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>'}
-                </svg>
-                <span class="font-mono text-xs tracking-wider">${message}</span>
-            `;
-            container.appendChild(toast);
-            setTimeout(() => toast.classList.add('show'), 10);
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 400);
-            }, 3000);
+        // UI Utils
+        function showToast(msg) {
+            const el = document.getElementById('toast');
+            el.innerText = msg;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 2000);
         }
+        function toggleMenu() { document.getElementById('dropdown-menu').classList.toggle('hide'); }
+        document.addEventListener('click', (e) => {
+            const m = document.getElementById('dropdown-menu');
+            if(!m.classList.contains('hide') && !e.target.closest('.top-bar')) m.classList.add('hide');
+        });
 
-        function copyText(text) {
-            navigator.clipboard.writeText(text).then(() => showToast('TOKEN_COPIED')).catch(() => showToast('COPY_FAILED', 'error'));
+        // Copy
+        function copyText(txt) { navigator.clipboard.writeText(txt).then(() => showToast('COPIED')).catch(() => showToast('ERR_COPY')); }
+        function copyToClipboard(id) { copyText(document.getElementById(id).value); }
+
+        // Auth
+        window.onload = async () => { if(sessionToken) checkAuth(); };
+        async function checkAuth() {
+            try {
+                const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
+                if(res.ok) showApp(); else logout();
+            } catch(e) { logout(); }
         }
-        function copyToClipboard(elementId) { copyText(document.getElementById(elementId).value); }
-
-        window.onload = async () => {
-            if (sessionToken) {
-                try {
-                    const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                    if (res.ok) showDashboard();
-                    else logout();
-                } catch (e) { logout(); }
-            }
-        };
-
-        function showDashboard() {
-            document.getElementById('login-overlay').classList.add('hide');
-            const dash = document.getElementById('dashboard');
-            dash.classList.remove('hide');
-            setTimeout(() => dash.classList.remove('opacity-0'), 50);
-            refreshAll();
-            startLogPolling();
-            showToast('SYS_AUTH_SUCCESS');
-        }
-
         async function login() {
             const pin = document.getElementById('pin-input').value;
             try {
-                const res = await fetch('/admin/auth', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pin })
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    sessionToken = data.token;
+                const res = await fetch('/admin/auth', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({pin}) });
+                if(res.ok) {
+                    sessionToken = (await res.json()).token;
                     localStorage.setItem('ciel_session', sessionToken);
-                    showDashboard();
-                } else showToast('AUTH_REJECTED', 'error');
-            } catch (e) { showToast('NETWORK_ERROR', 'error'); }
+                    showApp();
+                } else showToast('INVALID_PIN');
+            } catch(e) { showToast('NET_ERR'); }
         }
-
         function logout() {
             sessionToken = ''; localStorage.removeItem('ciel_session');
             if(logInterval) clearInterval(logInterval);
-            document.getElementById('dashboard').classList.add('hide', 'opacity-0');
+            document.getElementById('app').classList.add('hide');
             document.getElementById('login-overlay').classList.remove('hide');
             document.getElementById('pin-input').value = '';
-            showToast('SESSION_TERMINATED');
+        }
+        function showApp() {
+            document.getElementById('login-overlay').classList.add('hide');
+            document.getElementById('app').classList.remove('hide');
+            refreshAll();
+            startLogPolling();
         }
 
-        function refreshAll() { refreshData(); refreshClientKeys(); refreshAnalytics(); }
+        function refreshAll() { refreshData(); refreshAnalytics(); }
 
+        // Data
         async function refreshAnalytics() {
             try {
                 const res = await fetch('/admin/analytics', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
                 if(!res.ok) return;
-                const data = await res.json();
-                document.getElementById('ana-today').innerText = data.today;
-                document.getElementById('ana-week').innerText = data.this_week;
-                document.getElementById('ana-month').innerText = data.this_month;
-                
-                const max = Math.max(data.this_month * 2, 50); 
-                document.getElementById('bar-today').style.width = Math.min((data.today / max) * 100 * 30, 100) + '%';
-                document.getElementById('bar-week').style.width = Math.min((data.this_week / max) * 100 * 4, 100) + '%';
-                document.getElementById('bar-month').style.width = Math.min((data.this_month / max) * 100, 100) + '%';
+                const d = await res.json();
+                document.getElementById('ana-today').innerText = d.today;
+                document.getElementById('ana-week').innerText = d.this_week;
+                document.getElementById('ana-month').innerText = d.this_month;
             } catch(e) {}
         }
 
         async function refreshData() {
             try {
-                const res = await fetch('/admin/keys', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                if(res.status === 401) return logout();
-                const data = await res.json();
+                // Fetch Upstream
+                const resKeys = await fetch('/admin/keys', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
+                if(resKeys.status===401) return logout();
+                const dataKeys = await resKeys.json();
                 
-                const grid = document.getElementById('keys-grid');
-                grid.innerHTML = '';
+                // Fetch Clients
+                const resClients = await fetch('/admin/client-keys', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
+                const dataClients = await resClients.json();
+
+                const list = document.getElementById('keys-list');
+                list.innerHTML = '';
                 
                 let total = 0, active = 0;
 
-                data.keys.forEach((k, index) => {
+                // Render Upstream Keys
+                dataKeys.keys.forEach((k, i) => {
                     const isHealthy = k.balance > 0;
                     if(isHealthy) active++;
                     total += (isHealthy ? k.balance : 0);
+                    const idPref = `k-${i}`;
                     
-                    const idPrefix = `key-${index}`;
-                    grid.innerHTML += `
-                        <div class="glass-panel card-3d p-3 flex flex-col justify-between ${!isHealthy ? 'dead' : ''}">
-                            <div class="flex justify-between items-start mb-2">
-                                <div class="flex items-center gap-1.5">
-                                    <div class="w-1.5 h-1.5 rounded-full ${isHealthy ? 'bg-[#00ffd6] shadow-[0_0_4px_#00ffd6]' : 'bg-red-500'}"></div>
-                                    <span class="text-[10px] font-mono text-slate-300">NODE_${index < 10 ? '0'+index : index} ${k.priority > 0 ? '(PRIORITY)' : ''}</span>
-                                </div>
-                                <div class="flex gap-1">
-                                    <button onclick="copyText('${k.key}')" class="text-slate-400 hover:text-white transition-colors" title="Copy"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
-                                    <button onclick="testKeyInline('${k.key}', 'bal-${idPrefix}')" class="text-slate-400 hover:text-[#00ffd6] transition-colors" title="Verify"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></button>
-                                    <button onclick="deleteKey('${k.key}')" class="text-slate-400 hover:text-red-400 transition-colors" title="Purge"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
-                                </div>
+                    list.innerHTML += `
+                        <div class="list-row">
+                            <div class="flex items-center gap-2 overflow-hidden w-2/5">
+                                <div class="w-1.5 h-1.5 rounded-full shrink-0 ${isHealthy ? 'bg-[var(--cyan)]' : 'bg-red-500'}"></div>
+                                <div class="truncate text-gray-300">${k.key.substring(0,8)}...${k.key.substring(k.key.length-3)}</div>
                             </div>
-                            <div class="font-mono text-xs text-slate-200 truncate mb-2 opacity-70">${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}</div>
-                            <div class="mt-auto">
-                                <p class="text-[9px] font-mono text-slate-500 mb-0.5">BALANCE</p>
-                                <p class="font-mono font-bold text-lg leading-none ${isHealthy ? 'text-white' : 'text-red-400'}" id="bal-${idPrefix}">${k.balance.toFixed(4)}</p>
+                            <div class="w-1/4 text-center ${isHealthy ? 'text-white' : 'text-red-400'}" id="bal-${idPref}">${k.balance.toFixed(2)}</div>
+                            <div class="flex items-center gap-1 w-[60px] justify-end">
+                                <div class="icon-btn" onclick="copyText('${k.key}')"><svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></div>
+                                <div class="icon-btn" onclick="testKeyInline('${k.key}', 'bal-${idPref}')"><svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></div>
+                                <div class="icon-btn danger" onclick="deleteKey('${k.key}')"><svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></div>
                             </div>
                         </div>
                     `;
                 });
+
                 document.getElementById('stat-active-keys').innerText = active;
-                document.getElementById('stat-total-pollen').innerText = total.toFixed(4);
+                document.getElementById('stat-total-pollen').innerText = total.toFixed(3);
+
+                // Divider if clients exist
+                if(dataClients.keys.length > 0) {
+                    list.innerHTML += `<div class="bg-[var(--panel)] text-[8px] text-gray-500 px-2 py-1 border-b border-[var(--border)]">CLIENT AGENTS</div>`;
+                }
+
+                // Render Client Keys
+                dataClients.keys.forEach(k => {
+                    list.innerHTML += `
+                        <div class="list-row !border-l-2 !border-l-[#8b5cf6]">
+                            <div class="flex items-center gap-2 overflow-hidden w-2/5">
+                                <div class="truncate text-[#8b5cf6] font-bold">${k.name}</div>
+                            </div>
+                            <div class="w-1/4 text-center text-gray-500 text-[9px] truncate">${k.key.substring(0,6)}...</div>
+                            <div class="flex items-center gap-1 w-[60px] justify-end">
+                                <div class="icon-btn" onclick="copyText('${k.key}')"><svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></div>
+                                <div class="icon-btn danger" onclick="deleteClientKey('${k.key}')"><svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></div>
+                            </div>
+                        </div>
+                    `;
+                });
+
             } catch(e) {}
         }
 
-        async function testKeyInline(key, elementId) {
-            const el = document.getElementById(elementId);
-            const originalText = el.innerText;
-            el.innerText = 'SYNC...'; el.classList.add('animate-pulse', 'text-[#00ffd6]');
+        async function testKeyInline(key, id) {
+            const el = document.getElementById(id);
+            const orig = el.innerText;
+            el.innerText = '...'; el.classList.add('blinking', '!text-[var(--cyan)]');
             try {
                 const res = await fetch(`/admin/test/${key}`, { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                const data = await res.json();
-                el.classList.remove('animate-pulse');
-                if (data.success) {
-                    el.innerText = data.balance.toFixed(4); el.classList.replace('text-[#00ffd6]', 'text-white');
-                    showToast('VERIFICATION_COMPLETE'); refreshAll();
-                } else {
-                    el.innerText = '0.0000'; el.classList.replace('text-[#00ffd6]', 'text-red-400');
-                    showToast('NODE_DEPLETED', 'error');
-                }
-            } catch (err) { el.classList.remove('animate-pulse'); el.innerText = originalText; showToast('NETWORK_ERROR', 'error'); }
+                const d = await res.json();
+                el.classList.remove('blinking');
+                if(d.success) { el.innerText = d.balance.toFixed(2); el.classList.replace('!text-[var(--cyan)]', 'text-white'); showToast('VERIFIED'); refreshAll(); }
+                else { el.innerText = '0.00'; el.classList.replace('!text-[var(--cyan)]', 'text-red-400'); showToast('DEAD'); }
+            } catch(e) { el.classList.remove('blinking'); el.innerText = orig; showToast('ERR'); }
         }
 
-        async function refreshClientKeys() {
-            try {
-                const res = await fetch('/admin/client-keys', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                const data = await res.json();
-                const grid = document.getElementById('client-keys-grid');
-                grid.innerHTML = '';
-                data.keys.forEach(k => {
-                    grid.innerHTML += `
-                        <div class="p-3 bg-white/5 rounded-lg border border-white/5 hover:border-[#00ffd6]/30 transition-colors flex items-center justify-between group">
-                            <div class="overflow-hidden pr-2">
-                                <h4 class="text-xs font-bold tracking-wide truncate">${k.name}</h4>
-                                <div class="flex items-center gap-1 mt-1">
-                                    <span class="text-[10px] font-mono text-[#00ffd6] opacity-80">${k.key.substring(0,8)}...${k.key.substring(k.key.length-4)}</span>
-                                    <svg onclick="copyText('${k.key}')" class="w-3 h-3 text-slate-500 hover:text-[#00ffd6] cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                                </div>
-                            </div>
-                            <button onclick="deleteClientKey('${k.key}')" class="w-6 h-6 rounded bg-red-500/10 text-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white shrink-0">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                            </button>
-                        </div>
-                    `;
-                });
-            } catch(e) {}
-        }
-
+        // Terminal
+        function startLogPolling() { if(logInterval) clearInterval(logInterval); fetchLogs(); logInterval=setInterval(fetchLogs, 4000); }
         async function fetchLogs() {
             try {
                 const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                if (res.ok) {
-                    const data = await res.json();
-                    const consoleDiv = document.getElementById('console-output');
-                    let wasAtBottom = (consoleDiv.scrollHeight - consoleDiv.scrollTop <= consoleDiv.clientHeight + 10);
-                    consoleDiv.innerHTML = data.logs.join('<br>') + '<br><span class="animate-pulse">_</span>';
-                    if (wasAtBottom) consoleDiv.scrollTop = consoleDiv.scrollHeight;
+                if(res.ok) {
+                    const d = await res.json();
+                    const c = document.getElementById('console-output');
+                    const wasBottom = (c.scrollHeight - c.scrollTop <= c.clientHeight + 10);
+                    c.innerHTML = d.logs.join('<br>') + '<span class="blinking">_</span>';
+                    if(wasBottom) c.scrollTop = c.scrollHeight;
                 }
-            } catch (e) {}
+            } catch(e) {}
         }
-        function startLogPolling() { if(logInterval) clearInterval(logInterval); fetchLogs(); logInterval = setInterval(fetchLogs, 4000); }
 
+        // Modals & API calls
         function showAddModal() { document.getElementById('add-modal').classList.remove('hide'); }
         function hideAddModal() { document.getElementById('add-modal').classList.add('hide'); document.getElementById('new-key').value=''; }
-        function showClientModal() { document.getElementById('client-modal').classList.remove('hide'); }
-        function hideClientModal() { document.getElementById('client-modal').classList.add('hide'); document.getElementById('new-client-name').value=''; }
+        function showPasswordModal() { document.getElementById('password-modal').classList.remove('hide'); }
+        function hidePasswordModal() { document.getElementById('password-modal').classList.add('hide'); document.getElementById('new-password').value=''; }
         function closeNewClientKeyModal() { document.getElementById('new-client-key-modal').classList.add('hide'); }
 
         async function addKey() {
             const key = document.getElementById('new-key').value;
-            const priority = document.getElementById('new-priority').value;
-            if(!key) return showToast('KEY_REQUIRED', 'error');
-            await fetch('/admin/keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ key, priority: parseInt(priority) }) });
-            hideAddModal(); refreshData(); showToast('NODE_ADDED');
+            const prio = document.getElementById('new-priority').value;
+            if(!key) return showToast('REQ_KEY');
+            await fetch('/admin/keys', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({key, priority:parseInt(prio)}) });
+            hideAddModal(); refreshData(); showToast('ADDED');
         }
         async function deleteKey(key) {
             if(!confirm('PURGE NODE?')) return;
-            await fetch(`/admin/keys/${key}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` }});
-            refreshData(); showToast('NODE_PURGED');
+            await fetch(`/admin/keys/${key}`, { method:'DELETE', headers:{'Authorization':`Bearer ${sessionToken}`} });
+            refreshData(); showToast('PURGED');
         }
         async function addClientKey() {
             const name = document.getElementById('new-client-name').value;
-            if(!name) return showToast('AGENT_ID_REQUIRED', 'error');
-            const res = await fetch('/admin/client-keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ name }) });
+            if(!name) return showToast('REQ_NAME');
+            const res = await fetch('/admin/client-keys', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({name}) });
             if(res.ok) {
-                const data = await res.json();
-                hideClientModal();
-                document.getElementById('display-new-client-key').value = data.key;
+                const d = await res.json();
+                document.getElementById('new-client-name').value = '';
+                document.getElementById('display-new-client-key').value = d.key;
                 document.getElementById('new-client-key-modal').classList.remove('hide');
-                refreshClientKeys(); showToast('AGENT_INIT');
+                refreshData(); showToast('AGENT_INIT');
             }
         }
         async function deleteClientKey(key) {
-            if(!confirm('CRITICAL: PURGE AGENT?')) return;
-            await fetch(`/admin/client-keys/${key}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` }});
-            refreshClientKeys(); showToast('AGENT_PURGED');
+            if(!confirm('PURGE AGENT?')) return;
+            await fetch(`/admin/client-keys/${key}`, { method:'DELETE', headers:{'Authorization':`Bearer ${sessionToken}`} });
+            refreshData(); showToast('PURGED');
+        }
+        async function changePassword() {
+            const np = document.getElementById('new-password').value;
+            if(!np) return showToast('REQ_PASS');
+            const res = await fetch('/admin/password', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({new_password:np}) });
+            if(res.ok) { showToast('PASS_UPDATED'); hidePasswordModal(); }
         }
     </script>
 </body>
