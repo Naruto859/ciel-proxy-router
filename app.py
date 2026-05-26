@@ -262,7 +262,7 @@ async def live_status():
     return {"logs": list(system_logs)}
 
 # --- THE SMART PROXY (SILENT FAILOVER) ---
-proxy_client = httpx.AsyncClient(timeout=120.0)
+proxy_client = httpx.AsyncClient(timeout=120.0, follow_redirects=True)
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def smart_proxy(request: Request, path: str):
@@ -278,17 +278,21 @@ async def smart_proxy(request: Request, path: str):
     url = f"{BASE_URL}/{path}"
     body = await request.body()
     
-    # AGGRESSIVE WAF BYPASS:
+    # Header Preservation for Vision and WAF Bypass:
     clean_headers = {
         "User-Agent": "curl/8.5.0",
         "Accept": "*/*"
     }
     
-    if "content-type" in request.headers:
-        clean_headers["Content-Type"] = request.headers["content-type"]
+    # Forward critical headers (including Vision support)
+    for k, v in request.headers.items():
+        k_lower = k.lower()
+        if k_lower.startswith("x-") or k_lower in ["accept-encoding", "content-length", "content-type"]:
+            clean_headers[k] = v
 
     # Internal Retry Loop for Silent Failover
     max_internal_retries = 5
+    state = {"sent_keepalive": False}
     
     async def generate_with_keepalive():
         current_active_key = None
@@ -305,6 +309,7 @@ async def smart_proxy(request: Request, path: str):
                 while not current_active_key:
                     # Every 15s yield a keep-alive ping
                     yield b": keep-alive - waiting for balance recovery\n\n"
+                    state["sent_keepalive"] = True
                     await asyncio.sleep(15)
                     wait_counter += 1
                     
@@ -331,18 +336,42 @@ async def smart_proxy(request: Request, path: str):
                     
                     response = await proxy_client.send(proxy_req, stream=True)
                     
-                    if response.status_code in (400, 401, 402, 403, 429, 500, 502, 503):
-                        add_log(f"Key {current_active_key[:10]} failed with {response.status_code}. Retrying...")
+                    # Handle specific error codes: only drain on auth/balance errors
+                    if response.status_code in (401, 402, 403):
+                        add_log(f"Key {current_active_key[:10]} failed with {response.status_code}. Draining and Retrying...")
                         await response.aread()
                         await response.aclose()
                         db.update_balance(current_active_key, 0.0)
                         current_active_key = None
                         continue
                     
-                    # Stream the actual response
+                    # For 400 (Vision/Payload errors) or 429 (Rate Limits), pass through and STOP
+                    if response.status_code in (400, 429):
+                        add_log(f"Upstream returned {response.status_code}. Passing through to client.")
+                        async for chunk in response.aiter_bytes():
+                            if state["sent_keepalive"]:
+                                yield b"data: " + chunk.replace(b"\n", b"\ndata: ") + b"\n\n"
+                            else:
+                                yield chunk
+                        await response.aclose()
+                        return
+
+                    if response.status_code >= 500:
+                        add_log(f"Upstream error {response.status_code}. Retrying...")
+                        await response.aread()
+                        await response.aclose()
+                        current_active_key = None
+                        continue
+                    
+                    # Stream the actual response with automatic decompression (aiter_bytes)
                     try:
-                        async for chunk in response.aiter_raw():
-                            yield chunk
+                        is_upstream_sse = "text/event-stream" in response.headers.get("content-type", "").lower()
+                        async for chunk in response.aiter_bytes():
+                            if state["sent_keepalive"] and not is_upstream_sse:
+                                # Wrap raw JSON in SSE format if we already yielded keep-alive pings
+                                yield b"data: " + chunk.replace(b"\n", b"\ndata: ") + b"\n\n"
+                            else:
+                                yield chunk
                     finally:
                         await response.aclose()
                     return # Successfully streamed
@@ -353,8 +382,21 @@ async def smart_proxy(request: Request, path: str):
                     continue
         
         if not current_active_key:
-            yield json.dumps({"error": "Exhausted all failover keys"}).encode()
+            err_json = json.dumps({"error": "Exhausted all failover keys"}).encode()
+            if state["sent_keepalive"]:
+                yield b"data: " + err_json + b"\n\n"
+            else:
+                yield err_json
 
-    # Determine if we should return an immediate StreamingResponse
-    # We always use StreamingResponse now to handle the keep-alive phase
-    return StreamingResponse(generate_with_keepalive(), status_code=200, media_type="text/event-stream")
+    # Determine media type: avoid hardcoding SSE if the client explicitly requested non-streaming
+    try:
+        is_stream = json.loads(body).get("stream", False) if body else False
+    except:
+        is_stream = False
+    
+    # If we are starting with NO keys, we MUST use SSE for the waiting keep-alive pings
+    no_keys = (await key_manager.get_best_key()) is None
+    media_type = "text/event-stream" if (is_stream or no_keys) else "application/json"
+
+    return StreamingResponse(generate_with_keepalive(), status_code=200, media_type=media_type)
+
