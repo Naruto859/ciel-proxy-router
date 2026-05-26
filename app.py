@@ -355,11 +355,21 @@ async def smart_proxy(request: Request, path: str):
                         # Every 15s yield a keep-alive ping if it's a stream
                         yield b": keep-alive - waiting for balance recovery\n\n"
                         state["sent_keepalive"] = True
-                    await asyncio.sleep(15)
-                    wait_counter += 1
-                    
-                    # Every 60s (4 * 15s) try a force pull
-                    if wait_counter % 4 == 0:
+                        await asyncio.sleep(15)
+                        wait_counter += 1
+                        
+                        # Every 300s (20 * 15s) try a force pull
+                        if wait_counter % 20 == 0:
+                            add_log("WAIT mode: Refreshing balances...")
+                            async with balance_check_lock:
+                                await key_manager.force_pull_balances()
+                            current_active_key = await key_manager.get_best_key()
+                            if current_active_key:
+                                add_log("Balance detected. Resuming request...")
+                                break
+                    else:
+                        # Silent 300s wait loop for non-streaming requests
+                        await asyncio.sleep(300)
                         add_log("WAIT mode: Refreshing balances...")
                         async with balance_check_lock:
                             await key_manager.force_pull_balances()
