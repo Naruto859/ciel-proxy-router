@@ -3,307 +3,350 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ciel Gateway | Manas CIEL</title>
+    <title>CIEL | Advanced Gateway Command</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --neon-blue: #00e5ff;
-            --deep-blue: #020b14;
-            --card-bg: rgba(0, 20, 40, 0.6);
-            --border-glow: rgba(0, 229, 255, 0.3);
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --neon-cyan: #00ffd6;
+            --neon-violet: #8b5cf6;
         }
-        
+
         body {
-            font-family: 'Rajdhani', sans-serif;
-            background-color: var(--deep-blue);
-            background-image: 
-                radial-gradient(circle at 15% 50%, rgba(0, 229, 255, 0.08), transparent 25%),
-                radial-gradient(circle at 85% 30%, rgba(0, 100, 255, 0.08), transparent 25%);
+            font-family: 'Outfit', sans-serif;
+            background-color: #0b0914;
             color: white;
             margin: 0;
             padding: 0;
-            overflow-x: hidden;
-            min-height: 100vh;
+            height: 100vh;
+            overflow: hidden; /* Desktop is entirely single screen */
         }
 
-        h1, h2, h3, .font-orbitron { font-family: 'Orbitron', sans-serif; }
-
-        /* CIEL Core Logo */
-        .ciel-core {
-            position: relative;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: radial-gradient(circle, #ffffff 10%, #00e5ff 40%, transparent 80%);
-            box-shadow: 0 0 20px #00e5ff, inset 0 0 10px #ffffff;
-            animation: core-pulse 3s infinite alternate;
+        /* Animated Liquid Background */
+        .liquid-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: -2;
+            background: linear-gradient(135deg, #090614 0%, #171030 50%, #051421 100%);
         }
-        .ciel-core::before, .ciel-core::after {
-            content: '';
+        .liquid-blob {
             position: absolute;
-            top: -5px; left: -5px; right: -5px; bottom: -5px;
             border-radius: 50%;
-            border: 1px solid rgba(0, 229, 255, 0.5);
-            animation: core-spin 4s linear infinite;
+            filter: blur(80px);
+            z-index: -1;
+            animation: float 20s infinite alternate ease-in-out;
+            opacity: 0.6;
         }
-        .ciel-core::after {
-            border: 1px dashed rgba(0, 229, 255, 0.8);
-            animation: core-spin-reverse 6s linear infinite;
-        }
-        @keyframes core-pulse { 0% { transform: scale(0.9); box-shadow: 0 0 10px #00e5ff; } 100% { transform: scale(1.1); box-shadow: 0 0 30px #00e5ff, 0 0 50px rgba(0,229,255,0.5); } }
-        @keyframes core-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes core-spin-reverse { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
+        .blob-1 { width: 50vw; height: 50vw; background: rgba(0, 255, 214, 0.15); top: -10%; left: -10%; }
+        .blob-2 { width: 40vw; height: 40vw; background: rgba(139, 92, 246, 0.15); bottom: -10%; right: -10%; animation-delay: -5s; }
 
-        /* Glass Panels */
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(10%, 10%) scale(1.1); }
+        }
+
+        /* Premium Glassmorphism */
         .glass-panel {
-            background: var(--card-bg);
-            backdrop-filter: blur(10px);
-            border: 1px solid var(--border-glow);
-            border-radius: 12px;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
             position: relative;
             overflow: hidden;
         }
-        .glass-panel::before {
+
+        /* Glowing AI Core Logo */
+        .ai-core {
+            position: relative;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #ffffff 0%, var(--neon-cyan) 30%, transparent 80%);
+            box-shadow: inset 0 0 20px rgba(255,255,255,0.8), 0 0 20px var(--neon-cyan);
+            border: 1px solid rgba(255,255,255,0.5);
+            backdrop-filter: blur(5px);
+            animation: core-breathe 4s infinite alternate ease-in-out;
+        }
+        .ai-core::after {
             content: '';
             position: absolute;
-            top: 0; left: -100%; width: 50%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(0,229,255,0.1), transparent);
-            transform: skewX(-20deg);
-            transition: 0.5s;
-        }
-        .glass-panel:hover::before { left: 200%; transition: 0.7s ease-in-out; }
-
-        /* Compact Grid */
-        .compact-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 1rem;
-        }
-
-        /* 3D Cards */
-        .card-3d {
-            perspective: 1000px;
-            height: 140px;
-        }
-        .card-inner {
-            width: 100%; height: 100%;
-            transition: transform 0.4s;
-            transform-style: preserve-3d;
-            position: relative;
-        }
-        .card-3d:hover .card-inner { transform: rotateX(5deg) rotateY(5deg); }
-        .card-face {
-            position: absolute;
-            width: 100%; height: 100%;
-            backface-visibility: hidden;
-            background: linear-gradient(145deg, rgba(0,30,60,0.8), rgba(0,10,25,0.9));
-            border: 1px solid rgba(0,229,255,0.3);
-            border-radius: 12px;
-            padding: 1rem;
-            display: flex;
-            flex-col;
-            box-shadow: inset 0 0 20px rgba(0,229,255,0.05);
-        }
-        .card-face.dead {
-            border-color: rgba(255, 50, 50, 0.5);
-            box-shadow: inset 0 0 20px rgba(255,50,50,0.1);
-        }
-
-        /* Buttons */
-        .ciel-btn {
-            background: transparent;
-            color: var(--neon-blue);
-            border: 1px solid var(--neon-blue);
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            font-family: 'Orbitron', sans-serif;
-            text-transform: uppercase;
-            font-size: 0.8rem;
-            letter-spacing: 1px;
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-        .ciel-btn:hover {
-            background: var(--neon-blue);
-            color: var(--deep-blue);
-            box-shadow: 0 0 15px var(--neon-blue);
-        }
-        
-        .fab {
-            position: fixed; bottom: 20px; right: 20px;
-            width: 50px; height: 50px;
-            background: var(--neon-blue); color: var(--deep-blue);
+            top: -4px; left: -4px; right: -4px; bottom: -4px;
             border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 24px; font-weight: bold;
-            box-shadow: 0 0 20px var(--neon-blue);
-            cursor: pointer; z-index: 50;
-            transition: transform 0.3s;
+            border: 1px solid var(--neon-cyan);
+            border-left-color: transparent;
+            animation: spin 3s linear infinite;
+            opacity: 0.7;
         }
-        .fab:hover { transform: scale(1.1) rotate(90deg); }
+        @keyframes core-breathe {
+            0% { box-shadow: inset 0 0 10px rgba(255,255,255,0.5), 0 0 15px var(--neon-cyan); transform: scale(0.95); }
+            100% { box-shadow: inset 0 0 25px rgba(255,255,255,1), 0 0 35px var(--neon-cyan), 0 0 50px rgba(0,255,214,0.4); transform: scale(1.05); }
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Bento Box Grid */
+        .bento-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            height: 100%;
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        @media (min-width: 1024px) {
+            body { overflow: hidden; }
+            .bento-grid {
+                grid-template-columns: 320px 1fr 350px;
+                grid-template-rows: 100%;
+                overflow: hidden;
+            }
+            .bento-col {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+                height: 100%;
+                overflow: hidden;
+            }
+            .scrollable-panel {
+                flex: 1;
+                overflow-y: auto;
+                padding-right: 4px;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
+
+        /* 3D Compact Card */
+        .card-3d {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            transform-style: preserve-3d;
+            border-left: 3px solid var(--neon-cyan);
+            background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+        }
+        .card-3d:hover {
+            transform: translateY(-3px) scale(1.01) rotateX(2deg);
+            box-shadow: 0 10px 20px rgba(0, 255, 214, 0.15), 0 4px 6px rgba(0,0,0,0.3);
+            border-left-color: #fff;
+            background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 100%);
+        }
+        .card-3d.dead { border-left-color: #ef4444; }
 
         /* Progress Bars */
-        .ciel-progress-bg { background: rgba(0,229,255,0.1); height: 6px; border-radius: 3px; overflow: hidden; margin-top: 4px; }
-        .ciel-progress-fill { background: var(--neon-blue); height: 100%; box-shadow: 0 0 10px var(--neon-blue); transition: width 1s ease-out; }
+        .prog-bg { background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; overflow: hidden; margin-top: 4px; }
+        .prog-fill { background: linear-gradient(90deg, var(--neon-violet), var(--neon-cyan)); height: 100%; transition: width 1s ease-out; }
 
-        /* Custom Toasts */
-        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
-        .toast {
-            background: rgba(0, 20, 40, 0.9); border-left: 4px solid var(--neon-blue); color: white;
-            padding: 12px 20px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: 1rem;
-            transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            display: flex; align-items: center; gap: 10px;
+        /* Buttons & Inputs */
+        .ciel-input {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.2s;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
         }
-        .toast.show { transform: translateX(0); }
-        .toast.error { border-left-color: #ff3333; }
-
-        /* Utility */
-        .hide { display: none !important; }
-        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 100; display: flex; align-items: center; justify-content: center; }
-        input { outline: none; background: rgba(0,0,0,0.5); border: 1px solid rgba(0,229,255,0.3); color: var(--neon-blue); padding: 10px; border-radius: 4px; width: 100%; font-family: 'Orbitron'; }
-        input:focus { border-color: var(--neon-blue); box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+        .ciel-input:focus { border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0,255,214,0.2); }
         
-        /* Copy Icon SVG */
-        .copy-icon { width: 14px; height: 14px; cursor: pointer; color: rgba(255,255,255,0.5); transition: color 0.2s; }
-        .copy-icon:hover { color: var(--neon-blue); }
+        .ciel-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid var(--glass-border);
+            color: white;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.2s;
+            cursor: pointer;
+            font-size: 0.85rem;
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+        }
+        .ciel-btn:hover { background: rgba(0,255,214,0.2); border-color: var(--neon-cyan); color: var(--neon-cyan); }
+        .ciel-btn.primary { background: var(--neon-cyan); color: #000; border-color: var(--neon-cyan); }
+        .ciel-btn.primary:hover { background: #fff; box-shadow: 0 0 15px var(--neon-cyan); }
+        .ciel-btn.danger:hover { background: rgba(239,68,68,0.2); border-color: #ef4444; color: #ef4444; }
+
+        /* Premium Glass Toasts */
+        #toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
+        .toast {
+            background: rgba(10, 15, 30, 0.85); backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border); border-left: 4px solid var(--neon-cyan);
+            color: white; padding: 12px 16px; border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            font-size: 0.85rem; font-weight: 600;
+            display: flex; align-items: center; gap: 10px;
+            transform: translateX(120%); opacity: 0;
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            pointer-events: auto;
+        }
+        .toast.show { transform: translateX(0); opacity: 1; }
+        .toast.error { border-left-color: #ef4444; }
+        
+        .hide { display: none !important; }
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); z-index: 100; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
-    <!-- Toast Container -->
+    <div class="liquid-bg">
+        <div class="liquid-blob blob-1"></div>
+        <div class="liquid-blob blob-2"></div>
+    </div>
+
     <div id="toast-container"></div>
 
-    <!-- Login Overlay -->
+    <!-- Login Auth -->
     <div id="login-overlay" class="overlay">
         <div class="glass-panel p-8 w-full max-w-sm text-center mx-4">
-            <div class="ciel-core mx-auto mb-6"></div>
-            <h1 class="text-2xl font-orbitron mb-2 tracking-widest text-[#00e5ff]">MANAS: CIEL</h1>
-            <p class="text-xs text-gray-400 mb-6 font-orbitron uppercase tracking-widest">Awaiting Authorization</p>
-            <input type="password" id="pin-input" placeholder="ACCESS CODE" class="text-center text-xl tracking-widest mb-6" onkeydown="if(event.key==='Enter') login()">
-            <button onclick="login()" class="ciel-btn w-full text-lg py-3">Authenticate</button>
+            <div class="ai-core mx-auto mb-6"></div>
+            <h1 class="text-2xl font-bold mb-1 tracking-wider text-white">CIEL <span class="text-[#00ffd6]">GATEWAY</span></h1>
+            <p class="text-xs text-slate-400 mb-6 font-mono tracking-widest">AWAITING SYSTEM AUTHORIZATION</p>
+            <input type="password" id="pin-input" placeholder="ACCESS PIN" class="ciel-input w-full text-center text-xl tracking-widest mb-6 py-3" onkeydown="if(event.key==='Enter') login()">
+            <button onclick="login()" class="ciel-btn primary w-full py-3 text-sm tracking-wider">AUTHENTICATE</button>
         </div>
     </div>
 
-    <!-- Main Dashboard -->
-    <main class="max-w-6xl mx-auto p-4 md:p-6 hide opacity-0 transition-opacity duration-500" id="dashboard">
+    <!-- Main Bento Dashboard -->
+    <main id="dashboard" class="bento-grid hide opacity-0 transition-opacity duration-700">
         
-        <!-- Header -->
-        <header class="flex justify-between items-center mb-6">
-            <div class="flex items-center gap-4">
-                <div class="ciel-core scale-75 transform origin-left"></div>
-                <div>
-                    <h1 class="text-2xl font-orbitron tracking-wider text-[#00e5ff] leading-none">CIEL<span class="text-white text-lg">_PROXY</span></h1>
-                    <p class="text-[10px] text-gray-400 font-orbitron uppercase tracking-widest mt-1">System Optimal</p>
+        <!-- LEFT COLUMN: Identity, Stats, Clients -->
+        <div class="bento-col lg:w-80">
+            <!-- Header Identity -->
+            <div class="glass-panel p-5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="ai-core" style="width: 40px; height: 40px;"></div>
+                    <div>
+                        <h1 class="text-xl font-bold leading-tight">CIEL</h1>
+                        <p class="text-[10px] font-mono text-[#00ffd6] tracking-widest">SYSTEM ONLINE</p>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="refreshAll()" class="p-2 bg-white/5 hover:bg-[#00ffd6]/20 rounded-lg text-white hover:text-[#00ffd6] transition-colors" title="Sync">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    </button>
+                    <button onclick="logout()" class="p-2 bg-white/5 hover:bg-red-500/20 rounded-lg text-white hover:text-red-400 transition-colors" title="Logout">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    </button>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <button onclick="refreshAll()" class="ciel-btn !px-3 !py-1 text-xs hidden md:block">Sync Data</button>
-                <div class="relative">
-                    <button onclick="toggleMenu()" class="ciel-btn !px-3 !py-1 text-xs">⋮</button>
-                    <div id="dropdown-menu" class="absolute right-0 mt-2 w-40 glass-panel py-2 hidden flex-col z-50">
-                        <button onclick="showPasswordModal(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm w-full font-orbitron text-[#00e5ff]">SYS_PASS</button>
-                        <button onclick="logout()" class="px-4 py-2 text-left hover:bg-white/10 text-sm w-full font-orbitron text-red-400 border-t border-white/10 mt-1 pt-2">LOGOUT</button>
+
+            <!-- Global Balance -->
+            <div class="glass-panel p-5">
+                <p class="text-[10px] font-mono text-slate-400 mb-1">TOTAL UPSTREAM BALANCE</p>
+                <div class="flex items-baseline gap-2">
+                    <h2 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-[#00ffd6]" id="stat-total-pollen">0.00</h2>
+                    <span class="text-sm font-mono text-[#00ffd6]">P</span>
+                </div>
+                <div class="mt-2 flex items-center gap-2 text-xs font-mono text-slate-300">
+                    <div class="w-2 h-2 bg-[#00ffd6] rounded-full shadow-[0_0_5px_#00ffd6]"></div>
+                    <span id="stat-active-keys" class="font-bold text-white">0</span> ACTIVE NODES
+                </div>
+            </div>
+
+            <!-- Analytics Bento -->
+            <div class="glass-panel p-5">
+                <div class="flex items-center gap-2 mb-4">
+                    <svg class="w-4 h-4 text-[#8b5cf6]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    <h3 class="text-sm font-bold tracking-wider">USAGE TRAFFIC</h3>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <div class="flex justify-between text-[10px] font-mono text-slate-400"><span>24H</span><span id="ana-today" class="text-white">0</span></div>
+                        <div class="prog-bg"><div class="prog-fill" id="bar-today" style="width: 0%"></div></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-[10px] font-mono text-slate-400"><span>7D</span><span id="ana-week" class="text-white">0</span></div>
+                        <div class="prog-bg"><div class="prog-fill" id="bar-week" style="width: 0%"></div></div>
+                    </div>
+                    <div class="col-span-2">
+                        <div class="flex justify-between text-[10px] font-mono text-slate-400"><span>30D</span><span id="ana-month" class="text-white">0</span></div>
+                        <div class="prog-bg"><div class="prog-fill" id="bar-month" style="width: 0%"></div></div>
                     </div>
                 </div>
             </div>
-        </header>
 
-        <!-- Analytics Overview -->
-        <div class="glass-panel p-4 mb-6">
-            <div class="flex items-center gap-2 mb-4">
-                <svg class="w-4 h-4 text-[#00e5ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                <h2 class="font-orbitron text-sm tracking-widest">NETWORK ANALYTICS</h2>
-            </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                    <div class="flex justify-between text-xs text-gray-400 font-orbitron mb-1"><span>24H CYCLE</span><span id="ana-today" class="text-white font-bold">0</span></div>
-                    <div class="ciel-progress-bg"><div class="ciel-progress-fill" id="bar-today" style="width: 0%"></div></div>
+            <!-- Client Agents Scrollable -->
+            <div class="glass-panel flex flex-col flex-1 min-h-[200px]">
+                <div class="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
+                    <h3 class="text-sm font-bold tracking-wider">CLIENT AGENTS</h3>
+                    <button onclick="showClientModal()" class="w-6 h-6 rounded bg-[#00ffd6]/20 text-[#00ffd6] flex items-center justify-center hover:bg-[#00ffd6] hover:text-black transition-colors">+</button>
                 </div>
-                <div>
-                    <div class="flex justify-between text-xs text-gray-400 font-orbitron mb-1"><span>7D CYCLE</span><span id="ana-week" class="text-white font-bold">0</span></div>
-                    <div class="ciel-progress-bg"><div class="ciel-progress-fill" id="bar-week" style="width: 0%"></div></div>
-                </div>
-                <div>
-                    <div class="flex justify-between text-xs text-gray-400 font-orbitron mb-1"><span>30D CYCLE</span><span id="ana-month" class="text-white font-bold">0</span></div>
-                    <div class="ciel-progress-bg"><div class="ciel-progress-fill" id="bar-month" style="width: 0%"></div></div>
-                </div>
-                <div>
-                    <div class="flex justify-between text-xs text-[#00e5ff] font-orbitron mb-1"><span>GLOBAL BALANCE</span><span id="stat-total-pollen" class="font-bold">0.00</span></div>
-                    <p class="text-[10px] text-gray-500 mt-1"><span id="stat-active-keys" class="text-white font-bold">0</span> ACTIVE NODES</p>
+                <div class="scrollable-panel p-2 flex flex-col gap-2" id="client-keys-grid">
+                    <!-- Client Cards Inject -->
                 </div>
             </div>
         </div>
 
-        <!-- Navigation -->
-        <div class="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide border-b border-white/10">
-            <button onclick="switchTab('upstream')" id="tab-upstream" class="pb-2 px-2 text-sm font-orbitron tracking-widest border-b-2 border-[#00e5ff] text-[#00e5ff] transition-all">UPSTREAM_NODES</button>
-            <button onclick="switchTab('clients')" id="tab-clients" class="pb-2 px-2 text-sm font-orbitron tracking-widest border-b-2 border-transparent text-gray-500 hover:text-white transition-all">CLIENT_AGENTS</button>
-            <button onclick="switchTab('logs')" id="tab-logs" class="pb-2 px-2 text-sm font-orbitron tracking-widest border-b-2 border-transparent text-gray-500 hover:text-white transition-all">SYS_TERMINAL</button>
-        </div>
-
-        <!-- Upstream Tab -->
-        <div id="section-upstream" class="transition-all">
-            <div class="compact-grid pb-20" id="keys-grid">
-                <!-- Cards injected here -->
+        <!-- CENTER COLUMN: Upstream Keys -->
+        <div class="bento-col">
+            <div class="glass-panel p-4 flex justify-between items-center shrink-0">
+                <h2 class="text-lg font-bold tracking-wider flex items-center gap-2">
+                    <svg class="w-5 h-5 text-[#00ffd6]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                    UPSTREAM NODES
+                </h2>
+                <button onclick="showAddModal()" class="ciel-btn primary text-xs !py-1.5">+ ADD NODE</button>
             </div>
-            <div class="fab" onclick="showAddModal()">+</div>
-        </div>
-
-        <!-- Clients Tab -->
-        <div id="section-clients" class="hide transition-all">
-            <div class="glass-panel p-4 mb-4 flex flex-col sm:flex-row gap-2">
-                <input type="text" id="new-client-name" placeholder="AGENT_ID" class="text-sm">
-                <button onclick="addClientKey()" class="ciel-btn !py-2 whitespace-nowrap">INIT_AGENT</button>
-            </div>
-            <div class="compact-grid" id="client-keys-grid">
-                <!-- Clients injected here -->
+            
+            <div class="scrollable-panel">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3" id="keys-grid">
+                    <!-- 3D Upstream Cards Inject -->
+                </div>
             </div>
         </div>
 
-        <!-- Terminal Tab -->
-        <div id="section-logs" class="hide transition-all pb-10">
-            <div class="glass-panel p-4 bg-black/80 font-mono text-xs text-[#00e5ff] h-[60vh] overflow-y-auto leading-relaxed shadow-inner" id="console-output">
-                <!-- Logs -->
+        <!-- RIGHT COLUMN: System Terminal -->
+        <div class="bento-col lg:w-80">
+            <div class="glass-panel flex flex-col h-full border border-slate-700 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+                <div class="p-3 border-b border-white/10 bg-black/40 flex items-center gap-2 shrink-0">
+                    <div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                    <div class="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                    <div class="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                    <span class="ml-2 text-[10px] font-mono text-slate-400 uppercase tracking-widest">system_terminal</span>
+                </div>
+                <div class="scrollable-panel p-4 bg-black/60 font-mono text-[11px] text-[#00ffd6] leading-relaxed break-words" id="console-output">
+                    <!-- Logs Inject -->
+                </div>
             </div>
         </div>
-
     </main>
 
     <!-- Modals -->
     <div id="add-modal" class="overlay hide">
         <div class="glass-panel p-6 w-full max-w-sm mx-4">
-            <h2 class="font-orbitron text-lg mb-4 text-[#00e5ff]">ADD_UPSTREAM_NODE</h2>
-            <input type="text" id="new-key" placeholder="SK_TOKEN" class="mb-4 text-sm">
-            <input type="number" id="new-priority" value="0" placeholder="PRIORITY_LVL" class="mb-6 text-sm">
+            <h2 class="text-lg font-bold mb-4 text-white">REGISTER UPSTREAM NODE</h2>
+            <input type="text" id="new-key" placeholder="API Key (sk-...)" class="ciel-input w-full mb-3">
+            <input type="number" id="new-priority" value="0" placeholder="Priority (High = First)" class="ciel-input w-full mb-6">
             <div class="flex gap-2">
-                <button onclick="hideAddModal()" class="ciel-btn flex-1 !border-gray-500 !text-gray-400 hover:!bg-gray-800">CANCEL</button>
-                <button onclick="addKey()" class="ciel-btn flex-1">EXECUTE</button>
+                <button onclick="hideAddModal()" class="ciel-btn flex-1">CANCEL</button>
+                <button onclick="addKey()" class="ciel-btn primary flex-1">EXECUTE</button>
             </div>
         </div>
     </div>
     
-    <div id="password-modal" class="overlay hide">
+    <div id="client-modal" class="overlay hide">
         <div class="glass-panel p-6 w-full max-w-sm mx-4">
-            <h2 class="font-orbitron text-lg mb-4 text-[#00e5ff]">OVERRIDE_SYS_PASS</h2>
-            <input type="password" id="new-password" placeholder="NEW_ACCESS_CODE" class="mb-6 text-sm">
+            <h2 class="text-lg font-bold mb-4 text-white">GENERATE AGENT KEY</h2>
+            <input type="text" id="new-client-name" placeholder="Agent ID (e.g. Hermes)" class="ciel-input w-full mb-6">
             <div class="flex gap-2">
-                <button onclick="hidePasswordModal()" class="ciel-btn flex-1 !border-gray-500 !text-gray-400 hover:!bg-gray-800">CANCEL</button>
-                <button onclick="changePassword()" class="ciel-btn flex-1 !border-red-500 !text-red-500 hover:!bg-red-500 hover:!text-white">OVERRIDE</button>
+                <button onclick="hideClientModal()" class="ciel-btn flex-1">CANCEL</button>
+                <button onclick="addClientKey()" class="ciel-btn primary flex-1">GENERATE</button>
             </div>
         </div>
     </div>
 
     <div id="new-client-key-modal" class="overlay hide">
-        <div class="glass-panel p-6 w-full max-w-sm mx-4 border-2 border-[#00e5ff]">
-            <h2 class="font-orbitron text-lg mb-2 text-[#00e5ff]">AGENT_INITIALIZED</h2>
-            <p class="text-[10px] text-red-400 font-orbitron mb-4">CRITICAL: COPY TOKEN NOW. DATA WILL PURGE ON CLOSE.</p>
+        <div class="glass-panel p-6 w-full max-w-sm mx-4 border border-[#00ffd6]">
+            <h2 class="text-lg font-bold mb-2 text-[#00ffd6]">AGENT INITIALIZED</h2>
+            <p class="text-[10px] text-red-400 font-mono mb-4">CRITICAL: COPY TOKEN NOW. DATA WILL PURGE ON CLOSE.</p>
             <div class="flex items-center gap-2 mb-6">
-                <input type="text" id="display-new-client-key" readonly class="text-sm font-mono flex-1">
-                <button onclick="copyToClipboard('display-new-client-key')" class="ciel-btn !p-2" title="Copy">
+                <input type="text" id="display-new-client-key" readonly class="ciel-input flex-1 text-center text-[#00ffd6]">
+                <button onclick="copyToClipboard('display-new-client-key')" class="ciel-btn" title="Copy">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                 </button>
             </div>
@@ -315,138 +358,87 @@
         let sessionToken = localStorage.getItem('ciel_session') || '';
         let logInterval = null;
 
-        // Custom Toast System
+        // Custom Toasts
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = `toast ${type === 'error' ? 'error' : ''}`;
             toast.innerHTML = `
-                <svg class="w-5 h-5 ${type === 'error' ? 'text-red-500' : 'text-[#00e5ff]'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    ${type === 'error' 
-                        ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>'
-                        : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>'}
+                <svg class="w-4 h-4 shrink-0 ${type === 'error' ? 'text-red-500' : 'text-[#00ffd6]'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    ${type === 'error' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>' : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>'}
                 </svg>
-                <span>${message}</span>
+                <span class="font-mono text-xs tracking-wider">${message}</span>
             `;
             container.appendChild(toast);
-            
-            // Trigger animation
             setTimeout(() => toast.classList.add('show'), 10);
-            
-            // Remove after 3s
             setTimeout(() => {
                 toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
+                setTimeout(() => toast.remove(), 400);
             }, 3000);
         }
 
-        // Copy Function
         function copyText(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                showToast('TOKEN_COPIED_TO_CLIPBOARD');
-            }).catch(err => {
-                showToast('COPY_FAILED', 'error');
-            });
+            navigator.clipboard.writeText(text).then(() => showToast('TOKEN_COPIED')).catch(() => showToast('COPY_FAILED', 'error'));
         }
-        function copyToClipboard(elementId) {
-            const el = document.getElementById(elementId);
-            copyText(el.value || el.innerText);
-        }
+        function copyToClipboard(elementId) { copyText(document.getElementById(elementId).value); }
 
-        // On Load Check
         window.onload = async () => {
             if (sessionToken) {
                 try {
                     const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                    if (res.ok) {
-                        showDashboard();
-                    } else {
-                        logout();
-                    }
-                } catch (e) {
-                    logout();
-                }
+                    if (res.ok) showDashboard();
+                    else logout();
+                } catch (e) { logout(); }
             }
         };
 
         function showDashboard() {
             document.getElementById('login-overlay').classList.add('hide');
-            const dashboard = document.getElementById('dashboard');
-            dashboard.classList.remove('hide');
-            setTimeout(() => dashboard.classList.remove('opacity-0'), 50);
+            const dash = document.getElementById('dashboard');
+            dash.classList.remove('hide');
+            setTimeout(() => dash.classList.remove('opacity-0'), 50);
             refreshAll();
             startLogPolling();
-            showToast('AUTHORIZATION_ACCEPTED');
+            showToast('SYS_AUTH_SUCCESS');
         }
 
-        // Auth
         async function login() {
             const pin = document.getElementById('pin-input').value;
             try {
                 const res = await fetch('/admin/auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ pin })
                 });
-                
                 if (res.ok) {
                     const data = await res.json();
                     sessionToken = data.token;
                     localStorage.setItem('ciel_session', sessionToken);
                     showDashboard();
-                } else {
-                    showToast('INVALID_ACCESS_CODE', 'error');
-                }
-            } catch (e) {
-                showToast('CONNECTION_TERMINATED', 'error');
-            }
+                } else showToast('AUTH_REJECTED', 'error');
+            } catch (e) { showToast('NETWORK_ERROR', 'error'); }
         }
 
         function logout() {
-            sessionToken = '';
-            localStorage.removeItem('ciel_session');
+            sessionToken = ''; localStorage.removeItem('ciel_session');
             if(logInterval) clearInterval(logInterval);
             document.getElementById('dashboard').classList.add('hide', 'opacity-0');
             document.getElementById('login-overlay').classList.remove('hide');
             document.getElementById('pin-input').value = '';
+            showToast('SESSION_TERMINATED');
         }
 
-        // UI Interactions
-        function toggleMenu() {
-            const menu = document.getElementById('dropdown-menu');
-            menu.classList.toggle('hidden');
-            menu.classList.toggle('flex');
-        }
+        function refreshAll() { refreshData(); refreshClientKeys(); refreshAnalytics(); }
 
-        function switchTab(tabId) {
-            ['upstream', 'clients', 'logs'].forEach(id => {
-                document.getElementById(`tab-${id}`).className = 'pb-2 px-2 text-sm font-orbitron tracking-widest border-b-2 border-transparent text-gray-500 hover:text-white transition-all';
-                document.getElementById(`section-${id}`).classList.add('hide');
-            });
-            
-            const activeTab = document.getElementById(`tab-${tabId}`);
-            activeTab.className = 'pb-2 px-2 text-sm font-orbitron tracking-widest border-b-2 border-[#00e5ff] text-[#00e5ff] transition-all';
-            document.getElementById(`section-${tabId}`).classList.remove('hide');
-        }
-
-        async function refreshAll() {
-            refreshData();
-            refreshClientKeys();
-            refreshAnalytics();
-        }
-
-        // Data Fetching
         async function refreshAnalytics() {
             try {
                 const res = await fetch('/admin/analytics', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
                 if(!res.ok) return;
                 const data = await res.json();
-                
                 document.getElementById('ana-today').innerText = data.today;
                 document.getElementById('ana-week').innerText = data.this_week;
                 document.getElementById('ana-month').innerText = data.this_month;
                 
-                const max = Math.max(data.this_month * 2, 100); // Dynamic scale
+                const max = Math.max(data.this_month * 2, 50); 
                 document.getElementById('bar-today').style.width = Math.min((data.today / max) * 100 * 30, 100) + '%';
                 document.getElementById('bar-week').style.width = Math.min((data.this_week / max) * 100 * 4, 100) + '%';
                 document.getElementById('bar-month').style.width = Math.min((data.this_month / max) * 100, 100) + '%';
@@ -462,90 +454,83 @@
                 const grid = document.getElementById('keys-grid');
                 grid.innerHTML = '';
                 
-                let total = 0;
-                let active = 0;
+                let total = 0, active = 0;
 
                 data.keys.forEach((k, index) => {
                     const isHealthy = k.balance > 0;
                     if(isHealthy) active++;
                     total += (isHealthy ? k.balance : 0);
-                    const isPrimary = k.priority > 0;
                     
-                    const cardClass = isHealthy ? 'card-face' : 'card-face dead';
                     const idPrefix = `key-${index}`;
-
                     grid.innerHTML += `
-                        <div class="card-3d">
-                            <div class="card-inner">
-                                <div class="${cardClass} flex flex-col justify-between">
-                                    <div class="flex justify-between items-start">
-                                        <div class="flex items-center gap-2">
-                                            <span class="w-2 h-2 rounded-full ${isHealthy ? 'bg-[#00e5ff] shadow-[0_0_5px_#00e5ff]' : 'bg-red-500'}"></span>
-                                            <span class="font-mono text-sm tracking-widest text-gray-300">NODE_${index < 10 ? '0'+index : index}</span>
-                                        </div>
-                                        ${isPrimary ? '<span class="text-[9px] font-orbitron bg-[#00e5ff]/20 text-[#00e5ff] px-1 rounded border border-[#00e5ff]/50">PRIORITY</span>' : ''}
-                                    </div>
-                                    <div class="flex items-center gap-2 mt-2">
-                                        <p class="font-mono text-xs text-white truncate flex-1">${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}</p>
-                                        <svg onclick="copyText('${k.key}')" class="copy-icon flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                                    </div>
-                                    <div class="flex justify-between items-end mt-auto">
-                                        <div>
-                                            <p class="text-[10px] text-gray-500 font-orbitron">BALANCE</p>
-                                            <p class="font-mono font-bold text-[#00e5ff] text-lg leading-none mt-1" id="bal-${idPrefix}">${k.balance.toFixed(4)}</p>
-                                        </div>
-                                        <div class="flex gap-2">
-                                            <button onclick="testKeyInline('${k.key}', 'bal-${idPrefix}')" class="text-xs text-gray-400 hover:text-[#00e5ff] transition-colors" title="Live Verify">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                            </button>
-                                            <button onclick="deleteKey('${k.key}')" class="text-xs text-gray-400 hover:text-red-500 transition-colors" title="Purge Node">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                            </button>
-                                        </div>
-                                    </div>
+                        <div class="glass-panel card-3d p-3 flex flex-col justify-between ${!isHealthy ? 'dead' : ''}">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-1.5 h-1.5 rounded-full ${isHealthy ? 'bg-[#00ffd6] shadow-[0_0_4px_#00ffd6]' : 'bg-red-500'}"></div>
+                                    <span class="text-[10px] font-mono text-slate-300">NODE_${index < 10 ? '0'+index : index} ${k.priority > 0 ? '(PRIORITY)' : ''}</span>
                                 </div>
+                                <div class="flex gap-1">
+                                    <button onclick="copyText('${k.key}')" class="text-slate-400 hover:text-white transition-colors" title="Copy"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
+                                    <button onclick="testKeyInline('${k.key}', 'bal-${idPrefix}')" class="text-slate-400 hover:text-[#00ffd6] transition-colors" title="Verify"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></button>
+                                    <button onclick="deleteKey('${k.key}')" class="text-slate-400 hover:text-red-400 transition-colors" title="Purge"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                                </div>
+                            </div>
+                            <div class="font-mono text-xs text-slate-200 truncate mb-2 opacity-70">${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}</div>
+                            <div class="mt-auto">
+                                <p class="text-[9px] font-mono text-slate-500 mb-0.5">BALANCE</p>
+                                <p class="font-mono font-bold text-lg leading-none ${isHealthy ? 'text-white' : 'text-red-400'}" id="bal-${idPrefix}">${k.balance.toFixed(4)}</p>
                             </div>
                         </div>
                     `;
                 });
-
                 document.getElementById('stat-active-keys').innerText = active;
                 document.getElementById('stat-total-pollen').innerText = total.toFixed(4);
             } catch(e) {}
+        }
+
+        async function testKeyInline(key, elementId) {
+            const el = document.getElementById(elementId);
+            const originalText = el.innerText;
+            el.innerText = 'SYNC...'; el.classList.add('animate-pulse', 'text-[#00ffd6]');
+            try {
+                const res = await fetch(`/admin/test/${key}`, { headers: { 'Authorization': `Bearer ${sessionToken}` }});
+                const data = await res.json();
+                el.classList.remove('animate-pulse');
+                if (data.success) {
+                    el.innerText = data.balance.toFixed(4); el.classList.replace('text-[#00ffd6]', 'text-white');
+                    showToast('VERIFICATION_COMPLETE'); refreshAll();
+                } else {
+                    el.innerText = '0.0000'; el.classList.replace('text-[#00ffd6]', 'text-red-400');
+                    showToast('NODE_DEPLETED', 'error');
+                }
+            } catch (err) { el.classList.remove('animate-pulse'); el.innerText = originalText; showToast('NETWORK_ERROR', 'error'); }
         }
 
         async function refreshClientKeys() {
             try {
                 const res = await fetch('/admin/client-keys', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
                 const data = await res.json();
-                
                 const grid = document.getElementById('client-keys-grid');
                 grid.innerHTML = '';
-                
                 data.keys.forEach(k => {
                     grid.innerHTML += `
-                        <div class="glass-panel p-4 flex flex-col justify-between h-28 border-l-4 border-[#00e5ff]">
-                            <div class="flex justify-between items-start">
-                                <h3 class="font-orbitron font-bold text-sm tracking-wider">${k.name}</h3>
-                                <button onclick="deleteClientKey('${k.key}')" class="text-xs text-gray-500 hover:text-red-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                        <div class="p-3 bg-white/5 rounded-lg border border-white/5 hover:border-[#00ffd6]/30 transition-colors flex items-center justify-between group">
+                            <div class="overflow-hidden pr-2">
+                                <h4 class="text-xs font-bold tracking-wide truncate">${k.name}</h4>
+                                <div class="flex items-center gap-1 mt-1">
+                                    <span class="text-[10px] font-mono text-[#00ffd6] opacity-80">${k.key.substring(0,8)}...${k.key.substring(k.key.length-4)}</span>
+                                    <svg onclick="copyText('${k.key}')" class="w-3 h-3 text-slate-500 hover:text-[#00ffd6] cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                </div>
                             </div>
-                            <div class="flex items-center gap-2 mt-2">
-                                <p class="font-mono text-xs text-[#00e5ff] truncate">${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}</p>
-                                <svg onclick="copyText('${k.key}')" class="copy-icon flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                            </div>
-                            <p class="text-[9px] text-gray-500 font-mono mt-2">INIT: ${new Date(k.created_at).toLocaleDateString()}</p>
+                            <button onclick="deleteClientKey('${k.key}')" class="w-6 h-6 rounded bg-red-500/10 text-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white shrink-0">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
                         </div>
                     `;
                 });
             } catch(e) {}
         }
 
-        function startLogPolling() {
-            if (logInterval) clearInterval(logInterval);
-            fetchLogs();
-            logInterval = setInterval(fetchLogs, 5000);
-        }
-        
         async function fetchLogs() {
             try {
                 const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
@@ -553,111 +538,47 @@
                     const data = await res.json();
                     const consoleDiv = document.getElementById('console-output');
                     let wasAtBottom = (consoleDiv.scrollHeight - consoleDiv.scrollTop <= consoleDiv.clientHeight + 10);
-                    
                     consoleDiv.innerHTML = data.logs.join('<br>') + '<br><span class="animate-pulse">_</span>';
                     if (wasAtBottom) consoleDiv.scrollTop = consoleDiv.scrollHeight;
                 }
             } catch (e) {}
         }
+        function startLogPolling() { if(logInterval) clearInterval(logInterval); fetchLogs(); logInterval = setInterval(fetchLogs, 4000); }
 
-        // Modals & Actions
         function showAddModal() { document.getElementById('add-modal').classList.remove('hide'); }
         function hideAddModal() { document.getElementById('add-modal').classList.add('hide'); document.getElementById('new-key').value=''; }
-        function showPasswordModal() { document.getElementById('password-modal').classList.remove('hide'); }
-        function hidePasswordModal() { document.getElementById('password-modal').classList.add('hide'); document.getElementById('new-password').value=''; }
-        function closeNewClientKeyModal() { document.getElementById('new-client-key-modal').classList.add('hide'); document.getElementById('display-new-client-key').value = ''; }
+        function showClientModal() { document.getElementById('client-modal').classList.remove('hide'); }
+        function hideClientModal() { document.getElementById('client-modal').classList.add('hide'); document.getElementById('new-client-name').value=''; }
+        function closeNewClientKeyModal() { document.getElementById('new-client-key-modal').classList.add('hide'); }
 
         async function addKey() {
             const key = document.getElementById('new-key').value;
             const priority = document.getElementById('new-priority').value;
-            if(!key) return showToast('KEY_STRING_REQUIRED', 'error');
-            
-            await fetch('/admin/keys', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-                body: JSON.stringify({ key, priority: parseInt(priority) })
-            });
-            
-            hideAddModal();
-            refreshData();
-            showToast('NODE_ADDED_SUCCESSFULLY');
+            if(!key) return showToast('KEY_REQUIRED', 'error');
+            await fetch('/admin/keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ key, priority: parseInt(priority) }) });
+            hideAddModal(); refreshData(); showToast('NODE_ADDED');
         }
-
         async function deleteKey(key) {
-            if (!confirm('PURGE UPSTREAM NODE?')) return;
+            if(!confirm('PURGE NODE?')) return;
             await fetch(`/admin/keys/${key}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` }});
-            refreshData();
-            showToast('NODE_PURGED');
+            refreshData(); showToast('NODE_PURGED');
         }
-
-        async function testKeyInline(key, elementId) {
-            const el = document.getElementById(elementId);
-            const originalText = el.innerText;
-            el.innerText = 'SYNC...';
-            el.classList.add('animate-pulse');
-            
-            try {
-                const res = await fetch(`/admin/test/${key}`, { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                const data = await res.json();
-                el.classList.remove('animate-pulse');
-                
-                if (data.success) {
-                    el.innerText = data.balance.toFixed(4);
-                    showToast('VERIFICATION_COMPLETE');
-                    refreshAll(); // To update colors if state changed
-                } else {
-                    el.innerText = '0.0000';
-                    el.classList.replace('text-[#00e5ff]', 'text-red-500');
-                    showToast('VERIFICATION_FAILED_DEAD_NODE', 'error');
-                }
-            } catch (err) { 
-                el.classList.remove('animate-pulse');
-                el.innerText = originalText;
-                showToast('NETWORK_ERROR', 'error'); 
-            }
-        }
-
         async function addClientKey() {
             const name = document.getElementById('new-client-name').value;
             if(!name) return showToast('AGENT_ID_REQUIRED', 'error');
-            
-            const res = await fetch('/admin/client-keys', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-                body: JSON.stringify({ name })
-            });
-            
+            const res = await fetch('/admin/client-keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ name }) });
             if(res.ok) {
                 const data = await res.json();
-                document.getElementById('new-client-name').value = '';
+                hideClientModal();
                 document.getElementById('display-new-client-key').value = data.key;
                 document.getElementById('new-client-key-modal').classList.remove('hide');
-                refreshClientKeys();
-                showToast('AGENT_INITIALIZED');
+                refreshClientKeys(); showToast('AGENT_INIT');
             }
         }
-
         async function deleteClientKey(key) {
-            if (!confirm('CRITICAL: PURGE CLIENT AGENT?')) return;
+            if(!confirm('CRITICAL: PURGE AGENT?')) return;
             await fetch(`/admin/client-keys/${key}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` }});
-            refreshClientKeys();
-            showToast('AGENT_PURGED');
-        }
-
-        async function changePassword() {
-            const new_password = document.getElementById('new-password').value;
-            if(!new_password) return showToast('ACCESS_CODE_REQUIRED', 'error');
-            
-            const res = await fetch('/admin/password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-                body: JSON.stringify({ new_password })
-            });
-            
-            if(res.ok) {
-                showToast('SYS_PASS_OVERRIDDEN');
-                hidePasswordModal();
-            }
+            refreshClientKeys(); showToast('AGENT_PURGED');
         }
     </script>
 </body>
