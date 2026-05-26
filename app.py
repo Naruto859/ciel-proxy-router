@@ -13,11 +13,23 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import httpx
+from datetime import datetime, timezone, timedelta
+from collections import deque
 
 # --- CONFIGURATION ---
 DB_PATH = "proxy_data.db"
 BASE_URL = "https://gen.pollinations.ai"
 SESSION_TOKEN = secrets.token_hex(16)
+
+# --- SYSTEM LOGS ---
+system_logs = deque(maxlen=50)
+
+def add_log(msg: str):
+    ist = timezone(timedelta(hours=5, minutes=30))
+    ts = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S IST")
+    log_line = f"[{ts}] {msg}"
+    system_logs.append(log_line)
+    logger.info(msg)
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -243,6 +255,11 @@ async def change_password(req: PasswordChangeRequest):
     db.set_admin_password(req.new_password)
     return {"success": True}
 
+# --- SYSTEM LOGS API ---
+@app.get("/admin/live_status", dependencies=[Depends(verify_token)])
+async def live_status():
+    return {"logs": list(system_logs)}
+
 # --- THE SMART PROXY (SILENT FAILOVER) ---
 proxy_client = httpx.AsyncClient(timeout=120.0)
 
@@ -275,17 +292,18 @@ async def smart_proxy(request: Request, path: str):
         active_key = await key_manager.get_best_key()
         
         if not active_key:
-            logger.warning("No active keys found in DB cache. Attempting Force Pull...")
+            add_log("No active keys found in DB cache. Attempting Force Pull...")
             await key_manager.force_pull_balances()
             active_key = await key_manager.get_best_key()
             
-            if not active_key:
-                return JSONResponse({
-                    "error": {
-                        "message": "All API keys are confirmed depleted or blocked after a real-time check.",
-                        "type": "insufficient_quota"
-                    }
-                }, status_code=429)
+            while not active_key:
+                add_log("All balances empty. Entering WAIT mode for 300 seconds...")
+                await asyncio.sleep(300)
+                await key_manager.force_pull_balances()
+                active_key = await key_manager.get_best_key()
+                if active_key:
+                    add_log("Balance detected. Resuming request...")
+                    break
 
         clean_headers["Authorization"] = f"Bearer {active_key}"
         
@@ -301,7 +319,7 @@ async def smart_proxy(request: Request, path: str):
             response = await proxy_client.send(proxy_req, stream=True)
             
             if response.status_code in (400, 401, 402, 403, 429, 500, 502, 503):
-                logger.warning(f"Key {active_key[:10]} failed with {response.status_code}. Retrying with next key...")
+                add_log(f"Key {active_key[:10]} failed with {response.status_code}. Retrying with next key...")
                 await response.aread()
                 await response.aclose()
                 db.update_balance(active_key, 0.0)

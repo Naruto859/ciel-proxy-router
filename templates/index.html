@@ -134,9 +134,17 @@
         </div>
         
         <!-- Tabs -->
-        <div class="flex gap-4 border-b border-white/10 mb-6">
-            <div class="tab-btn active" onclick="switchTab('upstream')" id="tab-upstream">Upstream Provider Keys</div>
-            <div class="tab-btn" onclick="switchTab('clients')" id="tab-clients">Client API Keys</div>
+        <div class="relative mb-6">
+            <!-- Mobile 3-dot menu toggle -->
+            <div class="md:hidden flex justify-end mb-2">
+                <button onclick="document.getElementById('tab-menu').classList.toggle('hidden')" class="text-2xl text-white px-2 py-1 bg-white/10 rounded-lg">⋮</button>
+            </div>
+            
+            <div id="tab-menu" class="hidden md:flex flex-col md:flex-row gap-4 border-b border-white/10">
+                <div class="tab-btn active" onclick="switchTab('upstream')" id="tab-upstream">Upstream Provider Keys</div>
+                <div class="tab-btn" onclick="switchTab('clients')" id="tab-clients">Client API Keys</div>
+                <div class="tab-btn" onclick="switchTab('logs')" id="tab-logs">System Logs</div>
+            </div>
         </div>
 
         <!-- Upstream Tab -->
@@ -187,6 +195,16 @@
                     <tbody id="client-keys-table-body">
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Logs Tab -->
+        <div id="section-logs" class="glass-panel overflow-hidden hide">
+            <div class="p-6 border-b border-white/10">
+                <h2 class="text-xl font-semibold">Live System Console</h2>
+            </div>
+            <div class="p-6 bg-black/60 font-mono text-green-400 text-sm h-96 overflow-y-auto" style="box-shadow: inset 0 0 10px rgba(74, 222, 128, 0.2);" id="console-output">
+                <!-- Logs will appear here -->
             </div>
         </div>
     </main>
@@ -245,6 +263,7 @@
 
     <script>
         let sessionToken = '';
+        let logInterval = null;
 
         async function login() {
             const pin = document.getElementById('pin-input').value;
@@ -261,6 +280,7 @@
                 document.getElementById('dashboard').classList.remove('hide');
                 refreshData();
                 refreshClientKeys();
+                startLogPolling();
             } else {
                 alert('Invalid System Password');
             }
@@ -269,11 +289,41 @@
         function switchTab(tab) {
             document.getElementById('tab-upstream').classList.remove('active');
             document.getElementById('tab-clients').classList.remove('active');
+            document.getElementById('tab-logs').classList.remove('active');
+            
             document.getElementById('section-upstream').classList.add('hide');
             document.getElementById('section-clients').classList.add('hide');
+            document.getElementById('section-logs').classList.add('hide');
             
             document.getElementById(`tab-${tab}`).classList.add('active');
             document.getElementById(`section-${tab}`).classList.remove('hide');
+        }
+        
+        function startLogPolling() {
+            if (logInterval) clearInterval(logInterval);
+            fetchLogs();
+            logInterval = setInterval(fetchLogs, 5000);
+        }
+        
+        async function fetchLogs() {
+            try {
+                const res = await fetch('/admin/live_status', {
+                    headers: { 'Authorization': `Bearer ${sessionToken}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const consoleDiv = document.getElementById('console-output');
+                    let wasAtBottom = (consoleDiv.scrollHeight - consoleDiv.scrollTop <= consoleDiv.clientHeight + 10);
+                    
+                    consoleDiv.innerHTML = data.logs.join('<br>') + '<br><span class="animate-pulse">_</span>';
+                    
+                    if (wasAtBottom) {
+                        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+                    }
+                }
+            } catch (e) {
+                console.error("Log fetch failed", e);
+            }
         }
 
         async function refreshData() {
