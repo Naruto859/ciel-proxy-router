@@ -23,6 +23,7 @@ SESSION_TOKEN = secrets.token_hex(16)
 
 # --- SYSTEM LOGS ---
 system_logs = deque(maxlen=50)
+balance_check_lock = asyncio.Lock()
 
 def add_log(msg: str):
     ist = timezone(timedelta(hours=5, minutes=30))
@@ -288,58 +289,72 @@ async def smart_proxy(request: Request, path: str):
 
     # Internal Retry Loop for Silent Failover
     max_internal_retries = 5
-    for attempt in range(max_internal_retries):
-        active_key = await key_manager.get_best_key()
-        
-        if not active_key:
-            add_log("No active keys found in DB cache. Attempting Force Pull...")
-            await key_manager.force_pull_balances()
-            active_key = await key_manager.get_best_key()
+    
+    async def generate_with_keepalive():
+        current_active_key = None
+        for attempt in range(max_internal_retries):
+            current_active_key = await key_manager.get_best_key()
             
-            while not active_key:
-                add_log("All balances empty. Entering WAIT mode for 300 seconds...")
-                await asyncio.sleep(300)
-                await key_manager.force_pull_balances()
-                active_key = await key_manager.get_best_key()
-                if active_key:
-                    add_log("Balance detected. Resuming request...")
-                    break
-
-        clean_headers["Authorization"] = f"Bearer {active_key}"
-        
-        try:
-            proxy_req = proxy_client.build_request(
-                method=request.method,
-                url=url,
-                headers=clean_headers,
-                content=body,
-                params=request.query_params
-            )
+            if not current_active_key:
+                add_log(f"No active keys (Attempt {attempt+1}). Checking balances...")
+                async with balance_check_lock:
+                    await key_manager.force_pull_balances()
+                current_active_key = await key_manager.get_best_key()
+                
+                wait_counter = 0
+                while not current_active_key:
+                    # Every 15s yield a keep-alive ping
+                    yield b": keep-alive - waiting for balance recovery\n\n"
+                    await asyncio.sleep(15)
+                    wait_counter += 1
+                    
+                    # Every 60s (4 * 15s) try a force pull
+                    if wait_counter % 4 == 0:
+                        add_log("WAIT mode: Refreshing balances...")
+                        async with balance_check_lock:
+                            await key_manager.force_pull_balances()
+                        current_active_key = await key_manager.get_best_key()
+                        if current_active_key:
+                            add_log("Balance detected. Resuming request...")
+                            break
             
-            response = await proxy_client.send(proxy_req, stream=True)
-            
-            if response.status_code in (400, 401, 402, 403, 429, 500, 502, 503):
-                add_log(f"Key {active_key[:10]} failed with {response.status_code}. Retrying with next key...")
-                await response.aread()
-                await response.aclose()
-                db.update_balance(active_key, 0.0)
-                continue
-            
-            async def generate():
+            if current_active_key:
+                clean_headers["Authorization"] = f"Bearer {current_active_key}"
                 try:
-                    async for chunk in response.aiter_raw():
-                        yield chunk
-                finally:
-                    await response.aclose()
+                    proxy_req = proxy_client.build_request(
+                        method=request.method,
+                        url=url,
+                        headers=clean_headers,
+                        content=body,
+                        params=request.query_params
+                    )
+                    
+                    response = await proxy_client.send(proxy_req, stream=True)
+                    
+                    if response.status_code in (400, 401, 402, 403, 429, 500, 502, 503):
+                        add_log(f"Key {current_active_key[:10]} failed with {response.status_code}. Retrying...")
+                        await response.aread()
+                        await response.aclose()
+                        db.update_balance(current_active_key, 0.0)
+                        current_active_key = None
+                        continue
+                    
+                    # Stream the actual response
+                    try:
+                        async for chunk in response.aiter_raw():
+                            yield chunk
+                    finally:
+                        await response.aclose()
+                    return # Successfully streamed
 
-            resp_headers = dict(response.headers)
-            for h in ["content-encoding", "content-length", "transfer-encoding", "connection"]:
-                resp_headers.pop(h, None)
+                except Exception as e:
+                    logger.error(f"Proxy attempt {attempt} failed: {e}")
+                    current_active_key = None
+                    continue
+        
+        if not current_active_key:
+            yield json.dumps({"error": "Exhausted all failover keys"}).encode()
 
-            return StreamingResponse(generate(), status_code=response.status_code, headers=resp_headers)
-
-        except Exception as e:
-            logger.error(f"Proxy attempt {attempt} failed: {e}")
-            continue
-
-    return JSONResponse({"error": "Exhausted all failover keys"}, status_code=502)
+    # Determine if we should return an immediate StreamingResponse
+    # We always use StreamingResponse now to handle the keep-alive phase
+    return StreamingResponse(generate_with_keepalive(), status_code=200, media_type="text/event-stream")
