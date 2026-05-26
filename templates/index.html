@@ -3,259 +3,399 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ciel Proxy | Liquid Glass</title>
+    <title>Ciel Proxy | Premium 3D Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --glass: rgba(255, 255, 255, 0.1);
-            --glass-border: rgba(255, 255, 255, 0.2);
-            --accent: #a78bfa;
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --accent: #00ffd6;
         }
         body {
             font-family: 'Outfit', sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            background: linear-gradient(135deg, #09090b 0%, #171723 100%);
             min-height: 100vh;
             color: white;
             overflow-x: hidden;
+            margin: 0;
+            padding: 0;
         }
         .liquid-blob {
             position: fixed;
-            width: 400px;
-            height: 400px;
-            background: radial-gradient(circle, rgba(167,139,250,0.3) 0%, rgba(139,92,246,0) 70%);
+            width: 40vw;
+            height: 40vw;
+            background: radial-gradient(circle, rgba(0,255,214,0.15) 0%, rgba(8,226,96,0) 70%);
             border-radius: 50%;
             z-index: -1;
-            filter: blur(50px);
-            animation: move 20s infinite alternate;
+            filter: blur(60px);
+            animation: move 25s infinite alternate ease-in-out;
         }
         @keyframes move {
-            from { transform: translate(-10%, -10%); }
-            to { transform: translate(100%, 80%); }
+            0% { transform: translate(-20%, -20%) scale(1); }
+            50% { transform: translate(50%, 50%) scale(1.2); }
+            100% { transform: translate(120%, 80%) scale(0.8); }
         }
         .glass-panel {
             background: var(--glass);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
             border-radius: 24px;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--glass-border);
-            transition: all 0.3s ease;
+        
+        /* 3D Card CSS (Adapted from Smit-Prajapati) */
+        .parent-card {
+            width: 100%;
+            height: 280px;
+            perspective: 1000px;
+            margin-bottom: 1rem;
         }
-        .glass-card:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: translateY(-2px);
+        @media (min-width: 768px) {
+            .parent-card {
+                width: 290px;
+                height: 300px;
+            }
         }
-        input, button {
-            outline: none !important;
+        .card-3d {
+            height: 100%;
+            width: 100%;
+            border-radius: 40px;
+            background: linear-gradient(135deg, rgb(0, 255, 214) 0%, rgb(8, 226, 96) 100%);
+            transition: all 0.5s ease-in-out;
+            transform-style: preserve-3d;
+            box-shadow: rgba(5, 71, 17, 0) 40px 50px 25px -40px, rgba(5, 71, 17, 0.2) 0px 25px 25px -5px;
+            position: relative;
         }
-        .status-dot {
-            width: 8px;
-            height: 8px;
+        .card-3d.dead {
+            background: linear-gradient(135deg, rgb(255, 87, 87) 0%, rgb(180, 10, 10) 100%);
+        }
+        .card-3d.normal {
+            background: linear-gradient(135deg, rgb(65, 88, 208) 0%, rgb(200, 80, 192) 100%);
+        }
+        .glass-inner {
+            transform-style: preserve-3d;
+            position: absolute;
+            inset: 8px;
+            border-radius: 35px;
+            border-top-right-radius: 100%;
+            background: linear-gradient(0deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.4) 100%);
+            transform: translate3d(0px, 0px, 25px);
+            border-left: 1px solid rgba(255,255,255,0.3);
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+            transition: all 0.5s ease-in-out;
+            pointer-events: none;
+        }
+        .content-3d {
+            padding: 80px 40px 0px 25px;
+            transform: translate3d(0, 0, 26px);
+            pointer-events: none;
+        }
+        .content-3d .title {
+            display: block;
+            color: #0f172a;
+            font-weight: 900;
+            font-size: 1.25rem;
+            word-break: break-all;
+        }
+        .content-3d .text {
+            display: block;
+            color: rgba(15, 23, 42, 0.8);
+            font-size: 0.9rem;
+            margin-top: 10px;
+            font-weight: 600;
+        }
+        .bottom-3d {
+            padding: 10px 12px;
+            transform-style: preserve-3d;
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transform: translate3d(0, 0, 26px);
+            z-index: 10;
+        }
+        .action-btn {
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.4);
+            color: #0f172a;
+            font-weight: bold;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .action-btn:hover {
+            background: rgba(255,255,255,0.4);
+            transform: scale(1.05);
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .parent-card:hover .card-3d {
+                transform: rotate3d(1, 1, 0, 15deg);
+                box-shadow: rgba(5, 71, 17, 0.3) 30px 50px 25px -40px, rgba(5, 71, 17, 0.1) 0px 25px 30px 0px;
+            }
+        }
+
+        /* FAB Button */
+        .fab {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, rgb(0, 255, 214) 0%, rgb(8, 226, 96) 100%);
+            color: #000;
             border-radius: 50%;
-            display: inline-block;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            box-shadow: 0 10px 25px rgba(0, 255, 214, 0.4);
+            cursor: pointer;
+            z-index: 40;
+            transition: transform 0.3s;
         }
-        .pulse { animation: pulse-animation 2s infinite; }
-        @keyframes pulse-animation {
-            0% { box-shadow: 0 0 0 0px rgba(167, 139, 250, 0.4); }
-            100% { box-shadow: 0 0 0 10px rgba(167, 139, 250, 0); }
+        .fab:hover {
+            transform: scale(1.1) rotate(90deg);
         }
-        #login-overlay {
+
+        /* Refresh Button Animation */
+        .refresh-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: white;
+            transition: all 0.3s;
+        }
+        .refresh-btn:active .refresh-icon {
+            transform: rotate(180deg);
+            transition: transform 0.3s;
+        }
+
+        /* Overlays */
+        .overlay {
             position: fixed;
             inset: 0;
-            background: rgba(15, 23, 42, 0.9);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(20px);
             z-index: 100;
             display: flex;
             align-items: center;
             justify-content: center;
+            opacity: 1;
+            transition: opacity 0.3s;
         }
-        .hide { display: none !important; }
-        
-        /* Tabs */
-        .tab-btn {
-            padding: 0.5rem 1rem;
-            border-bottom: 2px solid transparent;
-            cursor: pointer;
-            transition: all 0.3s;
+        .overlay.hide {
+            opacity: 0;
+            pointer-events: none;
         }
-        .tab-btn.active {
-            border-bottom-color: var(--accent);
-            color: var(--accent);
-        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+        /* Progress Bar Base */
+        .progress-bar-bg { background-color: rgba(255,255,255,0.1); border-radius: 9999px; height: 8px; overflow: hidden; }
+        .progress-bar-fill { background: linear-gradient(90deg, #00ffd6, #8b5cf6); height: 100%; border-radius: 9999px; transition: width 1s ease-out; }
     </style>
 </head>
 <body class="p-4 md:p-8">
     <div class="liquid-blob"></div>
     
-    <!-- Auth Overlay -->
-    <div id="login-overlay">
-        <div class="glass-panel p-8 w-full max-w-md text-center">
-            <h1 class="text-3xl font-bold mb-6 text-purple-300">Ciel Admin</h1>
-            <p class="text-slate-400 mb-6">Enter System Password to access dashboard</p>
-            <input type="password" id="pin-input" placeholder="••••••••" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-center text-2xl tracking-widest mb-4">
-            <button onclick="login()" class="w-full bg-purple-600 hover:bg-purple-500 p-4 rounded-xl font-semibold transition-all">Unlock System</button>
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="overlay">
+        <div class="glass-panel p-8 w-full max-w-md text-center mx-4">
+            <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-[#00ffd6] to-[#08e260] rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(0,255,214,0.4)]">
+                <svg class="w-10 h-10 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+            </div>
+            <h1 class="text-3xl font-bold mb-2 text-white">Ciel Gateway</h1>
+            <p class="text-slate-400 mb-8 text-sm">Secure Admin Authentication</p>
+            <input type="password" id="pin-input" placeholder="••••••••" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-center text-2xl tracking-widest mb-6 focus:border-[#00ffd6] transition-colors outline-none text-white">
+            <button onclick="login()" class="w-full bg-gradient-to-r from-[#00ffd6] to-[#08e260] text-slate-900 p-4 rounded-xl font-bold text-lg hover:shadow-[0_0_20px_rgba(0,255,214,0.4)] transition-all">Authenticate</button>
         </div>
     </div>
 
     <!-- Main Dashboard -->
-    <main class="max-w-6xl mx-auto hide" id="dashboard">
-        <header class="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
+    <main class="max-w-7xl mx-auto hidden opacity-0 transition-opacity duration-500" id="dashboard">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-8 relative">
             <div>
-                <h1 class="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-300">
-                    Ciel Multi-Agent Gateway
+                <h1 class="text-2xl md:text-4xl font-black tracking-tight text-white flex items-center gap-3">
+                    <div class="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-[#00ffd6] to-[#08e260] rounded-lg shadow-[0_0_15px_rgba(0,255,214,0.5)]"></div>
+                    CIEL
                 </h1>
-                <p class="text-slate-400 mt-1">Status: <span class="text-green-400 font-medium">System Online</span></p>
+                <p class="text-slate-400 mt-1 text-sm md:text-base">Intelligent Multi-Agent Proxy</p>
             </div>
-            <div class="flex gap-3">
-                <button onclick="showPasswordModal()" class="glass-panel px-4 py-2 hover:bg-white/10 transition-all font-medium text-sm">
-                    ⚙️ Change Password
+            <div class="flex items-center gap-3">
+                <button onclick="refreshAll()" class="refresh-btn px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2">
+                    <svg class="w-4 h-4 refresh-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    <span class="hidden md:inline">Refresh</span>
                 </button>
+                <!-- 3-Dot Menu -->
+                <div class="relative">
+                    <button onclick="toggleMenu()" class="refresh-btn p-2 rounded-xl text-xl leading-none w-10 h-10 flex items-center justify-center">⋮</button>
+                    <div id="dropdown-menu" class="absolute right-0 mt-2 w-48 glass-panel py-2 hidden flex-col z-50">
+                        <button onclick="showPasswordModal(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full">Change Password</button>
+                        <button onclick="logout()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-red-400 w-full border-t border-white/10 mt-1 pt-2">Logout</button>
+                    </div>
+                </div>
             </div>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="glass-panel p-6">
-                <p class="text-slate-400 text-sm mb-1">Active Upstream Keys</p>
-                <h3 class="text-3xl font-bold" id="stat-active-keys">0</h3>
+        <!-- Analytics Summary & Stats (Glassmorphism UI) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Global Stats -->
+            <div class="glass-panel p-6 flex flex-col justify-center">
+                <div class="flex justify-between items-center mb-4">
+                    <p class="text-slate-400 font-medium">Upstream Balance</p>
+                    <span class="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-lg font-bold">LIVE</span>
+                </div>
+                <h3 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#00ffd6] to-white" id="stat-total-pollen">0.00</h3>
+                <p class="text-sm text-slate-500 mt-2"><span id="stat-active-keys" class="text-white font-bold">0</span> Active Keys available</p>
             </div>
-            <div class="glass-panel p-6">
-                <p class="text-slate-400 text-sm mb-1">Total Upstream Balance</p>
-                <h3 class="text-3xl font-bold text-purple-300" id="stat-total-pollen">0.00</h3>
-            </div>
-            <div class="glass-panel p-6">
-                <p class="text-slate-400 text-sm mb-1">Client Agents</p>
-                <h3 class="text-3xl font-bold text-blue-300" id="stat-client-keys">0</h3>
+
+            <!-- Analytics Card (Adapted from emmanuelh-dev snippet) -->
+            <div class="glass-panel p-6 lg:col-span-2">
+                <h3 class="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    Usage Analytics (Requests)
+                </h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div>
+                        <p class="text-slate-400 text-xs font-mono mb-1">TODAY (24H)</p>
+                        <p class="text-2xl font-bold text-white mb-2" id="ana-today">0</p>
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-today" style="width: 0%"></div></div>
+                    </div>
+                    <div>
+                        <p class="text-slate-400 text-xs font-mono mb-1">THIS WEEK</p>
+                        <p class="text-2xl font-bold text-white mb-2" id="ana-week">0</p>
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-week" style="width: 0%"></div></div>
+                    </div>
+                    <div>
+                        <p class="text-slate-400 text-xs font-mono mb-1">THIS MONTH</p>
+                        <p class="text-2xl font-bold text-white mb-2" id="ana-month">0</p>
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-month" style="width: 0%"></div></div>
+                    </div>
+                    <div>
+                        <p class="text-slate-400 text-xs font-mono mb-1">THIS YEAR</p>
+                        <p class="text-2xl font-bold text-white mb-2" id="ana-year">0</p>
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-year" style="width: 0%"></div></div>
+                    </div>
+                </div>
             </div>
         </div>
-        
-        <!-- Tabs -->
-        <div class="relative mb-6">
-            <!-- Mobile 3-dot menu toggle -->
-            <div class="md:hidden flex justify-end mb-2">
-                <button onclick="document.getElementById('tab-menu').classList.toggle('hidden')" class="text-2xl text-white px-2 py-1 bg-white/10 rounded-lg">⋮</button>
+
+        <!-- Navigation Tabs -->
+        <div class="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
+            <button onclick="switchTab('upstream')" id="tab-upstream" class="whitespace-nowrap px-6 py-3 rounded-full bg-white/10 text-white font-bold transition-all border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.1)]">3D Upstream Keys</button>
+            <button onclick="switchTab('clients')" id="tab-clients" class="whitespace-nowrap px-6 py-3 rounded-full bg-transparent text-slate-400 font-medium hover:text-white transition-all">Client Agents</button>
+            <button onclick="switchTab('logs')" id="tab-logs" class="whitespace-nowrap px-6 py-3 rounded-full bg-transparent text-slate-400 font-medium hover:text-white transition-all">System Console</button>
+        </div>
+
+        <!-- Upstream 3D Grid -->
+        <div id="section-upstream" class="transition-all duration-500">
+            <div id="keys-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-24">
+                <!-- 3D Cards Inject Here -->
             </div>
             
-            <div id="tab-menu" class="hidden md:flex flex-col md:flex-row gap-4 border-b border-white/10">
-                <div class="tab-btn active" onclick="switchTab('upstream')" id="tab-upstream">Upstream Provider Keys</div>
-                <div class="tab-btn" onclick="switchTab('clients')" id="tab-clients">Client API Keys</div>
-                <div class="tab-btn" onclick="switchTab('logs')" id="tab-logs">System Logs</div>
-            </div>
+            <!-- Mobile FAB -->
+            <div class="fab" onclick="showAddModal()">+</div>
         </div>
 
-        <!-- Upstream Tab -->
-        <div id="section-upstream" class="glass-panel overflow-hidden">
-            <div class="p-6 border-b border-white/10 flex justify-between items-center">
-                <h2 class="text-xl font-semibold">Pollinations Keys (Upstream)</h2>
-                <div class="flex gap-3">
-                    <button onclick="refreshData()" class="text-sm text-purple-400 hover:text-purple-300">Refresh All</button>
-                    <button onclick="showAddModal()" class="text-sm bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-medium transition-all">+ Add Upstream Key</button>
+        <!-- Clients Section -->
+        <div id="section-clients" class="hidden transition-all duration-500">
+            <div class="glass-panel p-6 mb-6">
+                <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Client Agent Keys</h2>
+                        <p class="text-sm text-slate-400">Generate keys for Hermes or other clients.</p>
+                    </div>
+                    <div class="flex w-full md:w-auto gap-2">
+                        <input type="text" id="new-client-name" placeholder="Agent Name (e.g. Hermes)" class="flex-1 md:w-64 bg-black/50 border border-white/10 px-4 py-3 rounded-xl text-sm focus:border-[#00ffd6] outline-none text-white transition-colors">
+                        <button onclick="addClientKey()" class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl font-bold hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all whitespace-nowrap">Generate</button>
+                    </div>
                 </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                    <thead>
-                        <tr class="text-slate-400 text-sm border-b border-white/5">
-                            <th class="p-6 font-medium">Priority</th>
-                            <th class="p-6 font-medium">Key Snippet</th>
-                            <th class="p-6 font-medium">Balance</th>
-                            <th class="p-6 font-medium">Status</th>
-                            <th class="p-6 font-medium text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="keys-table-body">
-                    </tbody>
-                </table>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="client-keys-grid">
+                <!-- Client Cards Inject Here -->
             </div>
         </div>
 
-        <!-- Clients Tab -->
-        <div id="section-clients" class="glass-panel overflow-hidden hide">
-            <div class="p-6 border-b border-white/10 flex justify-between items-center">
-                <h2 class="text-xl font-semibold">Client Agent Keys</h2>
-                <div class="flex gap-3">
-                    <input type="text" id="new-client-name" placeholder="Agent Name (e.g. Hermes)" class="bg-white/5 border border-white/10 px-3 py-2 rounded-lg text-sm">
-                    <button onclick="addClientKey()" class="text-sm bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg font-medium transition-all">+ Generate Key</button>
+        <!-- Logs Section -->
+        <div id="section-logs" class="hidden transition-all duration-500 pb-10">
+            <div class="glass-panel overflow-hidden border border-[#00ffd6]/30 shadow-[0_0_30px_rgba(0,255,214,0.1)]">
+                <div class="bg-slate-900/80 p-4 border-b border-white/10 flex gap-2 items-center">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="ml-2 text-xs font-mono text-slate-400">ciel-proxy@server:~</span>
+                </div>
+                <div class="p-6 bg-black font-mono text-[#00ffd6] text-sm h-[60vh] overflow-y-auto leading-relaxed" id="console-output">
+                    <!-- Logs -->
                 </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                    <thead>
-                        <tr class="text-slate-400 text-sm border-b border-white/5">
-                            <th class="p-6 font-medium">Agent Name</th>
-                            <th class="p-6 font-medium">API Key</th>
-                            <th class="p-6 font-medium">Created At</th>
-                            <th class="p-6 font-medium text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="client-keys-table-body">
-                    </tbody>
-                </table>
-            </div>
         </div>
 
-        <!-- Logs Tab -->
-        <div id="section-logs" class="glass-panel overflow-hidden hide">
-            <div class="p-6 border-b border-white/10">
-                <h2 class="text-xl font-semibold">Live System Console</h2>
-            </div>
-            <div class="p-6 bg-black/60 font-mono text-green-400 text-sm h-96 overflow-y-auto" style="box-shadow: inset 0 0 10px rgba(74, 222, 128, 0.2);" id="console-output">
-                <!-- Logs will appear here -->
-            </div>
-        </div>
     </main>
 
     <!-- Modal for Adding Upstream Key -->
-    <div id="add-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hide">
-        <div class="glass-panel p-8 w-full max-w-lg">
-            <h2 class="text-2xl font-bold mb-6">Register Upstream API Key</h2>
+    <div id="add-modal" class="overlay hide">
+        <div class="glass-panel p-8 w-full max-w-md mx-4">
+            <h2 class="text-2xl font-bold mb-6 text-white">Add Upstream Key</h2>
             <div class="space-y-4">
                 <div>
-                    <label class="text-sm text-slate-400 block mb-2">Pollinations Key</label>
-                    <input type="text" id="new-key" placeholder="sk-..." class="w-full bg-white/5 border border-white/10 p-4 rounded-xl">
+                    <label class="text-sm text-slate-400 block mb-2 font-mono">KEY STRING</label>
+                    <input type="text" id="new-key" placeholder="sk-..." class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none focus:border-[#00ffd6]">
                 </div>
                 <div>
-                    <label class="text-sm text-slate-400 block mb-2">Priority (Higher = used first)</label>
-                    <input type="number" id="new-priority" value="0" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl">
+                    <label class="text-sm text-slate-400 block mb-2 font-mono">PRIORITY (High = First)</label>
+                    <input type="number" id="new-priority" value="0" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none focus:border-[#00ffd6]">
                 </div>
                 <div class="flex gap-4 mt-8">
-                    <button onclick="hideAddModal()" class="flex-1 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all">Cancel</button>
-                    <button onclick="addKey()" class="flex-1 p-4 rounded-xl bg-purple-600 hover:bg-purple-500 font-semibold transition-all">Save Key</button>
+                    <button onclick="hideAddModal()" class="flex-1 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all font-bold">Cancel</button>
+                    <button onclick="addKey()" class="flex-1 p-4 rounded-xl bg-[#00ffd6] text-slate-900 font-black hover:shadow-[0_0_20px_rgba(0,255,214,0.4)] transition-all">Save Key</button>
                 </div>
             </div>
         </div>
     </div>
     
     <!-- Modal for Changing Password -->
-    <div id="password-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hide">
-        <div class="glass-panel p-8 w-full max-w-lg">
-            <h2 class="text-2xl font-bold mb-6">Change Admin Password</h2>
+    <div id="password-modal" class="overlay hide">
+        <div class="glass-panel p-8 w-full max-w-md mx-4">
+            <h2 class="text-2xl font-bold mb-6 text-white">System Password</h2>
             <div class="space-y-4">
                 <div>
-                    <label class="text-sm text-slate-400 block mb-2">New Password</label>
-                    <input type="password" id="new-password" placeholder="••••••••" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl">
+                    <label class="text-sm text-slate-400 block mb-2 font-mono">NEW PASSWORD</label>
+                    <input type="password" id="new-password" placeholder="••••••••" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none focus:border-red-400">
                 </div>
                 <div class="flex gap-4 mt-8">
-                    <button onclick="hidePasswordModal()" class="flex-1 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all">Cancel</button>
-                    <button onclick="changePassword()" class="flex-1 p-4 rounded-xl bg-purple-600 hover:bg-purple-500 font-semibold transition-all">Update</button>
+                    <button onclick="hidePasswordModal()" class="flex-1 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all font-bold">Cancel</button>
+                    <button onclick="changePassword()" class="flex-1 p-4 rounded-xl bg-red-500 text-white font-black hover:shadow-[0_0_20px_rgba(239,68,68,0.4)] transition-all">Update</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal for Displaying New Client Key -->
-    <div id="new-client-key-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hide">
-        <div class="glass-panel p-8 w-full max-w-lg">
-            <h2 class="text-2xl font-bold mb-2">Key Generated Successfully!</h2>
-            <p class="text-red-400 text-sm mb-6 font-semibold">Copy this key now. You will not be able to see it fully again.</p>
+    <!-- Modal for New Client Key -->
+    <div id="new-client-key-modal" class="overlay hide">
+        <div class="glass-panel p-8 w-full max-w-md mx-4 border border-[#00ffd6]/50">
+            <div class="flex items-center gap-3 mb-4 text-[#00ffd6]">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <h2 class="text-2xl font-bold">Agent Key Ready</h2>
+            </div>
+            <p class="text-red-400 text-sm mb-6 font-bold bg-red-500/10 p-3 rounded-lg border border-red-500/20">WARNING: Copy this key immediately. It will not be shown again.</p>
             <div class="space-y-4">
-                <input type="text" id="display-new-client-key" readonly class="w-full bg-black/30 border border-white/10 p-4 rounded-xl font-mono text-center text-lg text-green-300">
+                <input type="text" id="display-new-client-key" readonly class="w-full bg-black border border-[#00ffd6]/30 p-4 rounded-xl font-mono text-center text-lg text-[#00ffd6] shadow-inner outline-none">
                 <div class="flex mt-8">
-                    <button onclick="closeNewClientKeyModal()" class="w-full p-4 rounded-xl bg-purple-600 hover:bg-purple-500 font-semibold transition-all">I have copied it</button>
+                    <button onclick="closeNewClientKeyModal()" class="w-full p-4 rounded-xl bg-white/10 hover:bg-white/20 font-bold transition-all border border-white/10">I have saved it</button>
                 </div>
             </div>
         </div>
@@ -265,40 +405,168 @@
         let sessionToken = '';
         let logInterval = null;
 
-        async function login() {
-            const pin = document.getElementById('pin-input').value;
-            const res = await fetch('/admin/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pin })
+        // --- Core UI Functions ---
+        function toggleMenu() {
+            const menu = document.getElementById('dropdown-menu');
+            menu.classList.toggle('hidden');
+            menu.classList.toggle('flex');
+        }
+
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('dropdown-menu');
+            const btn = menu.previousElementSibling;
+            if(!menu.contains(e.target) && !btn.contains(e.target)) {
+                menu.classList.add('hidden');
+                menu.classList.remove('flex');
+            }
+        });
+
+        function switchTab(tabId) {
+            ['upstream', 'clients', 'logs'].forEach(id => {
+                document.getElementById(`tab-${id}`).className = 'whitespace-nowrap px-6 py-3 rounded-full bg-transparent text-slate-400 font-medium hover:text-white transition-all';
+                document.getElementById(`section-${id}`).classList.add('hidden');
             });
             
-            if (res.ok) {
-                const data = await res.json();
-                sessionToken = data.token;
-                document.getElementById('login-overlay').classList.add('hide');
-                document.getElementById('dashboard').classList.remove('hide');
-                refreshData();
-                refreshClientKeys();
-                startLogPolling();
-            } else {
-                alert('Invalid System Password');
+            const activeTab = document.getElementById(`tab-${tabId}`);
+            activeTab.className = 'whitespace-nowrap px-6 py-3 rounded-full bg-white/10 text-white font-bold transition-all border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.1)]';
+            document.getElementById(`section-${tabId}`).classList.remove('hidden');
+        }
+
+        // --- Auth ---
+        async function login() {
+            const pin = document.getElementById('pin-input').value;
+            try {
+                const res = await fetch('/admin/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    sessionToken = data.token;
+                    document.getElementById('login-overlay').classList.add('hide');
+                    const dashboard = document.getElementById('dashboard');
+                    dashboard.classList.remove('hidden');
+                    setTimeout(() => dashboard.classList.remove('opacity-0'), 50);
+                    refreshAll();
+                    startLogPolling();
+                } else {
+                    alert('Invalid System Password');
+                }
+            } catch (e) {
+                alert('Connection Error');
             }
         }
-        
-        function switchTab(tab) {
-            document.getElementById('tab-upstream').classList.remove('active');
-            document.getElementById('tab-clients').classList.remove('active');
-            document.getElementById('tab-logs').classList.remove('active');
-            
-            document.getElementById('section-upstream').classList.add('hide');
-            document.getElementById('section-clients').classList.add('hide');
-            document.getElementById('section-logs').classList.add('hide');
-            
-            document.getElementById(`tab-${tab}`).classList.add('active');
-            document.getElementById(`section-${tab}`).classList.remove('hide');
+
+        function logout() {
+            sessionToken = '';
+            if(logInterval) clearInterval(logInterval);
+            document.getElementById('dashboard').classList.add('hidden', 'opacity-0');
+            document.getElementById('login-overlay').classList.remove('hide');
+            document.getElementById('pin-input').value = '';
         }
-        
+
+        async function refreshAll() {
+            refreshData();
+            refreshClientKeys();
+            refreshAnalytics();
+        }
+
+        // --- Data Fetching ---
+        async function refreshAnalytics() {
+            try {
+                const res = await fetch('/admin/analytics', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
+                if(!res.ok) return;
+                const data = await res.json();
+                
+                document.getElementById('ana-today').innerText = data.today;
+                document.getElementById('ana-week').innerText = data.this_week;
+                document.getElementById('ana-month').innerText = data.this_month;
+                document.getElementById('ana-year').innerText = data.this_year;
+
+                // Max scale reference for progress bars (dynamic based on year max, clamped for visual)
+                const max = Math.max(data.this_year, 100);
+                document.getElementById('bar-today').style.width = Math.min((data.today / max) * 100 * 365, 100) + '%';
+                document.getElementById('bar-week').style.width = Math.min((data.this_week / max) * 100 * 52, 100) + '%';
+                document.getElementById('bar-month').style.width = Math.min((data.this_month / max) * 100 * 12, 100) + '%';
+                document.getElementById('bar-year').style.width = Math.min((data.this_year / max) * 100, 100) + '%';
+
+            } catch(e) {}
+        }
+
+        async function refreshData() {
+            try {
+                const res = await fetch('/admin/keys', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
+                const data = await res.json();
+                
+                const grid = document.getElementById('keys-grid');
+                grid.innerHTML = '';
+                
+                let total = 0;
+                let active = 0;
+
+                data.keys.forEach(k => {
+                    const isHealthy = k.balance > 0;
+                    if(isHealthy) active++;
+                    total += (isHealthy ? k.balance : 0);
+
+                    const isPrimary = k.priority > 0;
+                    const cardClass = isPrimary ? 'card-3d normal' : (isHealthy ? 'card-3d' : 'card-3d dead');
+                    const titleColor = isPrimary ? 'text-white' : (isHealthy ? 'text-slate-900' : 'text-white');
+                    const subtitleColor = isPrimary ? 'text-purple-200' : (isHealthy ? 'text-slate-800' : 'text-red-200');
+
+                    grid.innerHTML += `
+                        <div class="parent-card">
+                            <div class="${cardClass}">
+                                <div class="glass-inner"></div>
+                                <div class="content-3d">
+                                    <span class="title ${titleColor}">${k.key.substring(0, 12)}...</span>
+                                    <span class="text ${subtitleColor} block mt-4">Priority: ${isPrimary ? 'PRIMARY' : 'NORMAL'}</span>
+                                    <span class="text ${subtitleColor} block font-mono text-xl mt-1">${k.balance.toFixed(4)} <span class="text-sm">P</span></span>
+                                    <span class="text ${subtitleColor} block mt-2 flex items-center gap-2">
+                                        <span class="w-2 h-2 rounded-full ${isHealthy ? 'bg-white shadow-[0_0_8px_white]' : 'bg-black'}"></span>
+                                        ${isHealthy ? 'Active & Ready' : 'Depleted/Blocked'}
+                                    </span>
+                                </div>
+                                <div class="bottom-3d">
+                                    <button onclick="testKey('${k.key}')" class="action-btn">Verify</button>
+                                    <button onclick="deleteKey('${k.key}')" class="action-btn !bg-black/30 !text-white hover:!bg-black/50 !border-transparent">Revoke</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                document.getElementById('stat-active-keys').innerText = active;
+                document.getElementById('stat-total-pollen').innerText = total.toFixed(4);
+            } catch(e) {}
+        }
+
+        async function refreshClientKeys() {
+            try {
+                const res = await fetch('/admin/client-keys', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
+                const data = await res.json();
+                
+                const grid = document.getElementById('client-keys-grid');
+                grid.innerHTML = '';
+                
+                data.keys.forEach(k => {
+                    grid.innerHTML += `
+                        <div class="glass-panel p-6 relative overflow-hidden group">
+                            <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <h3 class="text-xl font-bold text-white mb-1 relative z-10">${k.name}</h3>
+                            <p class="font-mono text-sm text-[#00ffd6] mb-4 relative z-10">${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}</p>
+                            <div class="flex justify-between items-center relative z-10">
+                                <span class="text-xs text-slate-500">${new Date(k.created_at).toLocaleDateString()}</span>
+                                <button onclick="deleteClientKey('${k.key}')" class="text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded-lg hover:bg-red-500 hover:text-white transition-all">Revoke</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch(e) {}
+        }
+
         function startLogPolling() {
             if (logInterval) clearInterval(logInterval);
             fetchLogs();
@@ -307,93 +575,26 @@
         
         async function fetchLogs() {
             try {
-                const res = await fetch('/admin/live_status', {
-                    headers: { 'Authorization': `Bearer ${sessionToken}` }
-                });
+                const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
                 if (res.ok) {
                     const data = await res.json();
                     const consoleDiv = document.getElementById('console-output');
                     let wasAtBottom = (consoleDiv.scrollHeight - consoleDiv.scrollTop <= consoleDiv.clientHeight + 10);
                     
                     consoleDiv.innerHTML = data.logs.join('<br>') + '<br><span class="animate-pulse">_</span>';
-                    
-                    if (wasAtBottom) {
-                        consoleDiv.scrollTop = consoleDiv.scrollHeight;
-                    }
+                    if (wasAtBottom) consoleDiv.scrollTop = consoleDiv.scrollHeight;
                 }
-            } catch (e) {
-                console.error("Log fetch failed", e);
-            }
+            } catch (e) {}
         }
 
-        async function refreshData() {
-            const res = await fetch('/admin/keys', {
-                headers: { 'Authorization': `Bearer ${sessionToken}` }
-            });
-            const data = await res.json();
-            
-            const tbody = document.getElementById('keys-table-body');
-            tbody.innerHTML = '';
-            
-            let total = 0;
-            let active = 0;
-
-            data.keys.forEach(k => {
-                total += (k.balance > 0 ? k.balance : 0);
-                if (k.is_active) active++;
-
-                const row = document.createElement('tr');
-                row.className = 'border-b border-white/5 hover:bg-white/5 transition-all';
-                row.innerHTML = `
-                    <td class="p-6">
-                        <span class="${k.priority > 0 ? 'text-yellow-400' : 'text-slate-400'} font-bold">
-                            ${k.priority > 0 ? 'PRIMARY' : 'NORMAL'}
-                        </span>
-                    </td>
-                    <td class="p-6 font-mono text-sm">${k.key.substring(0, 12)}...</td>
-                    <td class="p-6 font-semibold">${k.balance.toFixed(4)} P</td>
-                    <td class="p-6">
-                        <span class="flex items-center gap-2">
-                            <span class="status-dot ${k.balance > 0 ? 'bg-green-400 pulse' : 'bg-red-400'}"></span>
-                            ${k.balance > 0 ? 'Healthy' : 'Empty/Blocked'}
-                        </span>
-                    </td>
-                    <td class="p-6 text-right">
-                        <button onclick="testKey('${k.key}')" class="text-xs bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full mr-2 hover:bg-purple-500/40">Test</button>
-                        <button onclick="deleteKey('${k.key}')" class="text-xs bg-red-500/20 text-red-300 px-3 py-1 rounded-full hover:bg-red-500/40">Remove</button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-
-            document.getElementById('stat-active-keys').innerText = active;
-            document.getElementById('stat-total-pollen').innerText = total.toFixed(4);
-        }
-
-        async function refreshClientKeys() {
-            const res = await fetch('/admin/client-keys', {
-                headers: { 'Authorization': `Bearer ${sessionToken}` }
-            });
-            const data = await res.json();
-            
-            const tbody = document.getElementById('client-keys-table-body');
-            tbody.innerHTML = '';
-            
-            document.getElementById('stat-client-keys').innerText = data.keys.length;
-
-            data.keys.forEach(k => {
-                const row = document.createElement('tr');
-                row.className = 'border-b border-white/5 hover:bg-white/5 transition-all';
-                row.innerHTML = `
-                    <td class="p-6 font-semibold">${k.name}</td>
-                    <td class="p-6 font-mono text-sm">${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}</td>
-                    <td class="p-6 text-slate-400 text-sm">${new Date(k.created_at).toLocaleString()}</td>
-                    <td class="p-6 text-right">
-                        <button onclick="deleteClientKey('${k.key}')" class="text-xs bg-red-500/20 text-red-300 px-4 py-2 rounded-lg hover:bg-red-500/40 font-medium transition-all">Revoke</button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
+        // --- Modals & Actions ---
+        function showAddModal() { document.getElementById('add-modal').classList.remove('hide'); }
+        function hideAddModal() { document.getElementById('add-modal').classList.add('hide'); }
+        function showPasswordModal() { document.getElementById('password-modal').classList.remove('hide'); }
+        function hidePasswordModal() { document.getElementById('password-modal').classList.add('hide'); }
+        function closeNewClientKeyModal() { 
+            document.getElementById('new-client-key-modal').classList.add('hide'); 
+            document.getElementById('display-new-client-key').value = '';
         }
 
         async function addKey() {
@@ -403,10 +604,7 @@
             
             await fetch('/admin/keys', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${sessionToken}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
                 body: JSON.stringify({ key, priority: parseInt(priority) })
             });
             
@@ -414,17 +612,30 @@
             hideAddModal();
             refreshData();
         }
-        
+
+        async function deleteKey(key) {
+            if (!confirm('Remove this upstream key?')) return;
+            await fetch(`/admin/keys/${key}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` }});
+            refreshData();
+        }
+
+        async function testKey(key) {
+            try {
+                const res = await fetch(`/admin/test/${key}`, { headers: { 'Authorization': `Bearer ${sessionToken}` }});
+                const data = await res.json();
+                refreshData();
+                if (data.success) alert(`Success! Balance: ${data.balance}`);
+                else alert('Test failed. Key might be invalid or blocked.');
+            } catch (err) { alert('Network Error'); }
+        }
+
         async function addClientKey() {
             const name = document.getElementById('new-client-name').value;
             if(!name) return alert("Agent name is required");
             
             const res = await fetch('/admin/client-keys', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${sessionToken}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
                 body: JSON.stringify({ name })
             });
             
@@ -436,10 +647,11 @@
                 refreshClientKeys();
             }
         }
-        
-        function closeNewClientKeyModal() {
-            document.getElementById('new-client-key-modal').classList.add('hide');
-            document.getElementById('display-new-client-key').value = '';
+
+        async function deleteClientKey(key) {
+            if (!confirm('CRITICAL: Revoke this Client Key?')) return;
+            await fetch(`/admin/client-keys/${key}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` }});
+            refreshClientKeys();
         }
 
         async function changePassword() {
@@ -448,60 +660,16 @@
             
             const res = await fetch('/admin/password', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${sessionToken}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
                 body: JSON.stringify({ new_password })
             });
             
             if(res.ok) {
-                alert("Admin password updated successfully!");
+                alert("Password updated!");
                 document.getElementById('new-password').value = '';
                 hidePasswordModal();
             }
         }
-
-        async function testKey(key) {
-            try {
-                const res = await fetch(`/admin/test/${key}`, {
-                    headers: { 'Authorization': `Bearer ${sessionToken}` }
-                });
-                const data = await res.json();
-                await refreshData();
-                if (data.success) {
-                    setTimeout(() => alert(`Success! Balance: ${data.balance}`), 10);
-                } else {
-                    setTimeout(() => alert('Test failed. Key might be invalid or blocked.'), 10);
-                }
-            } catch (err) {
-                console.error(err);
-                alert('Test failed due to network error.');
-            }
-        }
-
-        async function deleteKey(key) {
-            if (!confirm('Remove this upstream key?')) return;
-            await fetch(`/admin/keys/${key}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${sessionToken}` }
-            });
-            refreshData();
-        }
-        
-        async function deleteClientKey(key) {
-            if (!confirm('CRITICAL: Are you sure you want to REVOKE this Client Key? Agents using it will instantly fail.')) return;
-            await fetch(`/admin/client-keys/${key}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${sessionToken}` }
-            });
-            refreshClientKeys();
-        }
-
-        function showAddModal() { document.getElementById('add-modal').classList.remove('hide'); }
-        function hideAddModal() { document.getElementById('add-modal').classList.add('hide'); }
-        function showPasswordModal() { document.getElementById('password-modal').classList.remove('hide'); }
-        function hidePasswordModal() { document.getElementById('password-modal').classList.add('hide'); }
     </script>
 </body>
 </html>

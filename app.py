@@ -44,6 +44,7 @@ class DatabaseManager:
 
     def _init_db(self):
         with sqlite3.connect(self.path) as conn:
+            conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS keys (
                     key TEXT PRIMARY KEY,
@@ -67,8 +68,23 @@ class DatabaseManager:
                     value TEXT
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS usage_stats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    endpoint TEXT,
+                    status_code INTEGER
+                )
+            """)
             conn.execute("INSERT OR IGNORE INTO settings VALUES ('polling_interval', '300')")
             conn.execute("INSERT OR IGNORE INTO settings VALUES ('admin_password', 'Samirandas123@')")
+
+    def log_usage(self, endpoint: str, status_code: int):
+        ist = timezone(timedelta(hours=5, minutes=30))
+        ts = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
+        with sqlite3.connect(self.path) as conn:
+            conn.execute("INSERT INTO usage_stats (timestamp, endpoint, status_code) VALUES (?, ?, ?)", (ts, endpoint, status_code))
+
 
     def get_keys(self):
         with sqlite3.connect(self.path) as conn:
@@ -256,6 +272,29 @@ async def change_password(req: PasswordChangeRequest):
     db.set_admin_password(req.new_password)
     return {"success": True}
 
+# --- ANALYTICS API ---
+@app.get("/admin/analytics", dependencies=[Depends(verify_token)])
+async def get_analytics():
+    ist = timezone(timedelta(hours=5, minutes=30))
+    now = datetime.now(ist)
+    
+    def get_count(start_time: str):
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute("SELECT COUNT(*) FROM usage_stats WHERE timestamp >= ?", (start_time,)).fetchone()
+            return row[0] if row else 0
+
+    today = (now - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+    this_week = (now - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+    this_month = (now - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+    this_year = (now - timedelta(days=365)).strftime("%Y-%m-%d %H:%M:%S")
+
+    return {
+        "today": get_count(today),
+        "this_week": get_count(this_week),
+        "this_month": get_count(this_month),
+        "this_year": get_count(this_year)
+    }
+
 # --- SYSTEM LOGS API ---
 @app.get("/admin/live_status", dependencies=[Depends(verify_token)])
 async def live_status():
@@ -287,8 +326,13 @@ async def smart_proxy(request: Request, path: str):
     # Forward critical headers (including Vision support)
     for k, v in request.headers.items():
         k_lower = k.lower()
-        if k_lower.startswith("x-") or k_lower in ["accept-encoding", "content-length", "content-type"]:
+        if k_lower.startswith("x-") or k_lower in ["accept-encoding", "content-length", "content-type", "accept"]:
             clean_headers[k] = v
+
+    try:
+        is_stream = json.loads(body).get("stream", False) if body else False
+    except:
+        is_stream = False
 
     # Internal Retry Loop for Silent Failover
     max_internal_retries = 5
@@ -307,9 +351,10 @@ async def smart_proxy(request: Request, path: str):
                 
                 wait_counter = 0
                 while not current_active_key:
-                    # Every 15s yield a keep-alive ping
-                    yield b": keep-alive - waiting for balance recovery\n\n"
-                    state["sent_keepalive"] = True
+                    if is_stream:
+                        # Every 15s yield a keep-alive ping if it's a stream
+                        yield b": keep-alive - waiting for balance recovery\n\n"
+                        state["sent_keepalive"] = True
                     await asyncio.sleep(15)
                     wait_counter += 1
                     
@@ -335,6 +380,7 @@ async def smart_proxy(request: Request, path: str):
                     )
                     
                     response = await proxy_client.send(proxy_req, stream=True)
+                    db.log_usage(path, response.status_code)
                     
                     # Handle specific error codes: only drain on auth/balance errors
                     if response.status_code in (401, 402, 403):
@@ -344,6 +390,7 @@ async def smart_proxy(request: Request, path: str):
                         db.update_balance(current_active_key, 0.0)
                         current_active_key = None
                         continue
+
                     
                     # For 400 (Vision/Payload errors) or 429 (Rate Limits), pass through and STOP
                     if response.status_code in (400, 429):
