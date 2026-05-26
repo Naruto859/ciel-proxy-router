@@ -313,12 +313,22 @@
 
         <!-- Upstream 3D Grid -->
         <div id="section-upstream" class="transition-all duration-500">
+            <div class="glass-panel p-6 mb-6">
+                <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Upstream Nodes</h2>
+                        <p class="text-sm text-slate-400">Manage your connected API keys.</p>
+                    </div>
+                    <div class="flex w-full md:w-auto gap-2">
+                        <input type="text" id="new-key-inline" placeholder="Enter new API Key (sk-...)" class="flex-1 md:w-64 bg-black/50 border border-white/10 px-4 py-3 rounded-xl text-sm focus:border-[#00ffd6] outline-none text-white transition-colors">
+                        <button onclick="addKeyInline()" class="bg-gradient-to-r from-[#00ffd6] to-[#08e260] text-slate-900 px-6 py-3 rounded-xl font-bold hover:shadow-[0_0_15px_rgba(0,255,214,0.5)] transition-all whitespace-nowrap">Add Node</button>
+                    </div>
+                </div>
+            </div>
+            
             <div id="keys-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-24">
                 <!-- 3D Cards Inject Here -->
             </div>
-            
-            <!-- Mobile FAB -->
-            <div class="fab" onclick="showAddModal()">+</div>
         </div>
 
         <!-- Clients Section -->
@@ -413,7 +423,7 @@
     </div>
 
     <script>
-        let sessionToken = '';
+        let sessionToken = localStorage.getItem('ciel_session') || '';
         let logInterval = null;
 
         // --- Core UI Functions ---
@@ -443,6 +453,26 @@
             document.getElementById(`section-${tabId}`).classList.remove('hidden');
         }
 
+        window.onload = async () => {
+            if (sessionToken) {
+                try {
+                    const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
+                    if (res.ok) {
+                        document.getElementById('login-overlay').classList.add('hide');
+                        const dashboard = document.getElementById('dashboard');
+                        dashboard.classList.remove('hidden');
+                        setTimeout(() => dashboard.classList.remove('opacity-0'), 50);
+                        refreshAll();
+                        startLogPolling();
+                    } else {
+                        logout();
+                    }
+                } catch (e) {
+                    logout();
+                }
+            }
+        };
+
         // --- Auth ---
         async function login() {
             const pin = document.getElementById('pin-input').value;
@@ -456,6 +486,7 @@
                 if (res.ok) {
                     const data = await res.json();
                     sessionToken = data.token;
+                    localStorage.setItem('ciel_session', sessionToken);
                     document.getElementById('login-overlay').classList.add('hide');
                     const dashboard = document.getElementById('dashboard');
                     dashboard.classList.remove('hidden');
@@ -472,10 +503,9 @@
 
         function logout() {
             sessionToken = '';
+            localStorage.removeItem('ciel_session');
             if(logInterval) clearInterval(logInterval);
-            document.getElementById('dashboard').classList.add('hidden', 'opacity-0');
-            document.getElementById('login-overlay').classList.remove('hide');
-            document.getElementById('pin-input').value = '';
+            location.reload();
         }
 
         async function refreshAll() {
@@ -621,6 +651,20 @@
             
             document.getElementById('new-key').value = '';
             hideAddModal();
+            refreshData();
+        }
+        
+        async function addKeyInline() {
+            const key = document.getElementById('new-key-inline').value;
+            if(!key) return alert("API Key is required");
+            
+            await fetch('/admin/keys', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+                body: JSON.stringify({ key, priority: 0 })
+            });
+            
+            document.getElementById('new-key-inline').value = '';
             refreshData();
         }
 
