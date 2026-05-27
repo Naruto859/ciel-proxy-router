@@ -336,7 +336,6 @@ async def smart_proxy(request: Request, path: str):
 
     # Internal Retry Loop for Silent Failover
     max_internal_retries = 5
-    state = {"sent_keepalive": False}
     
     async def generate_with_keepalive():
         current_active_key = None
@@ -349,34 +348,16 @@ async def smart_proxy(request: Request, path: str):
                     await key_manager.force_pull_balances()
                 current_active_key = await key_manager.get_best_key()
                 
-                wait_counter = 0
                 while not current_active_key:
-                    if is_stream:
-                        # Every 15s yield a keep-alive ping if it's a stream
-                        yield b": keep-alive - waiting for balance recovery\n\n"
-                        state["sent_keepalive"] = True
-                        await asyncio.sleep(15)
-                        wait_counter += 1
-                        
-                        # Every 300s (20 * 15s) try a force pull
-                        if wait_counter % 20 == 0:
-                            add_log("WAIT mode: Refreshing balances...")
-                            async with balance_check_lock:
-                                await key_manager.force_pull_balances()
-                            current_active_key = await key_manager.get_best_key()
-                            if current_active_key:
-                                add_log("Balance detected. Resuming request...")
-                                break
-                    else:
-                        # Silent 300s wait loop for non-streaming requests
-                        await asyncio.sleep(300)
-                        add_log("WAIT mode: Refreshing balances...")
-                        async with balance_check_lock:
-                            await key_manager.force_pull_balances()
-                        current_active_key = await key_manager.get_best_key()
-                        if current_active_key:
-                            add_log("Balance detected. Resuming request...")
-                            break
+                    # 100% Silent 300s wait loop for ALL requests (prevents parser crashes)
+                    await asyncio.sleep(300)
+                    add_log("WAIT mode: Refreshing balances...")
+                    async with balance_check_lock:
+                        await key_manager.force_pull_balances()
+                    current_active_key = await key_manager.get_best_key()
+                    if current_active_key:
+                        add_log("Balance detected. Resuming request...")
+                        break
             
             if current_active_key:
                 clean_headers["Authorization"] = f"Bearer {current_active_key}"
@@ -401,15 +382,11 @@ async def smart_proxy(request: Request, path: str):
                         current_active_key = None
                         continue
 
-                    
                     # For 400 (Vision/Payload errors) or 429 (Rate Limits), pass through and STOP
                     if response.status_code in (400, 429):
                         add_log(f"Upstream returned {response.status_code}. Passing through to client.")
                         async for chunk in response.aiter_bytes():
-                            if state["sent_keepalive"]:
-                                yield b"data: " + chunk.replace(b"\n", b"\ndata: ") + b"\n\n"
-                            else:
-                                yield chunk
+                            yield chunk
                         await response.aclose()
                         return
 
@@ -420,15 +397,10 @@ async def smart_proxy(request: Request, path: str):
                         current_active_key = None
                         continue
                     
-                    # Stream the actual response with automatic decompression (aiter_bytes)
+                    # Stream the actual response natively (no wrappers)
                     try:
-                        is_upstream_sse = "text/event-stream" in response.headers.get("content-type", "").lower()
                         async for chunk in response.aiter_bytes():
-                            if state["sent_keepalive"] and not is_upstream_sse:
-                                # Wrap raw JSON in SSE format if we already yielded keep-alive pings
-                                yield b"data: " + chunk.replace(b"\n", b"\ndata: ") + b"\n\n"
-                            else:
-                                yield chunk
+                            yield chunk
                     finally:
                         await response.aclose()
                     return # Successfully streamed
@@ -439,11 +411,7 @@ async def smart_proxy(request: Request, path: str):
                     continue
         
         if not current_active_key:
-            err_json = json.dumps({"error": "Exhausted all failover keys"}).encode()
-            if state["sent_keepalive"]:
-                yield b"data: " + err_json + b"\n\n"
-            else:
-                yield err_json
+            yield json.dumps({"error": "Exhausted all failover keys"}).encode()
 
     # Determine media type: avoid hardcoding SSE if the client explicitly requested non-streaming
     try:
