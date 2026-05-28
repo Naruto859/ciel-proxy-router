@@ -341,30 +341,40 @@ async def smart_proxy(request: Request, path: str):
     except:
         is_stream = False
 
-    # Internal Retry Loop for Silent Failover
-    max_internal_retries = 5
+    # Safety Wall & Retry Loop
+    state = {"sent_keepalive": False}
     
     async def generate_with_keepalive():
+        # Pre-flight balance check for every new request
+        async with balance_check_lock:
+            await key_manager.force_pull_balances()
+            
         current_active_key = None
-        for attempt in range(max_internal_retries):
+        
+        while True:
             current_active_key = await key_manager.get_best_key()
             
             if not current_active_key:
-                add_log(f"No active keys (Attempt {attempt+1}). Checking balances...")
-                async with balance_check_lock:
-                    await key_manager.force_pull_balances()
-                current_active_key = await key_manager.get_best_key()
-                
+                add_log("No active keys available (Balance 0.00). Entering Safety Wall Wait Loop...")
+                wait_counter = 0
                 while not current_active_key:
-                    # 100% Silent 300s wait loop for ALL requests (prevents parser crashes)
-                    await asyncio.sleep(300)
-                    add_log("WAIT mode: Refreshing balances...")
-                    async with balance_check_lock:
-                        await key_manager.force_pull_balances()
-                    current_active_key = await key_manager.get_best_key()
-                    if current_active_key:
-                        add_log("Balance detected. Resuming request...")
-                        break
+                    if is_stream:
+                        yield b":\n\n"
+                        state["sent_keepalive"] = True
+                    else:
+                        yield b" "
+                        
+                    await asyncio.sleep(15)
+                    wait_counter += 1
+                    
+                    if wait_counter % 20 == 0:
+                        add_log("WAIT mode: Refreshing balances...")
+                        async with balance_check_lock:
+                            await key_manager.force_pull_balances()
+                        current_active_key = await key_manager.get_best_key()
+                        if current_active_key:
+                            add_log("Balance detected. Resuming request...")
+                            break
             
             if current_active_key:
                 clean_headers["Authorization"] = f"Bearer {current_active_key}"
@@ -380,9 +390,9 @@ async def smart_proxy(request: Request, path: str):
                     response = await proxy_client.send(proxy_req, stream=True)
                     db.log_usage(path, response.status_code)
                     
-                    # Handle specific error codes: only drain on auth/balance errors
+                    # Handle specific error codes: drain and shift to wait loop
                     if response.status_code in (401, 402, 403):
-                        add_log(f"Key {current_active_key[:10]} failed with {response.status_code}. Draining and Retrying...")
+                        add_log(f"Key {current_active_key[:10]} failed with {response.status_code}. Draining and shifting to Wait Loop...")
                         await response.aread()
                         await response.aclose()
                         db.update_balance(current_active_key, 0.0)
@@ -402,6 +412,7 @@ async def smart_proxy(request: Request, path: str):
                         await response.aread()
                         await response.aclose()
                         current_active_key = None
+                        await asyncio.sleep(2)
                         continue
                     
                     # Stream the actual response natively (no wrappers)
@@ -413,12 +424,10 @@ async def smart_proxy(request: Request, path: str):
                     return # Successfully streamed
 
                 except Exception as e:
-                    logger.error(f"Proxy attempt {attempt} failed: {e}")
+                    logger.error(f"Proxy attempt failed: {e}")
                     current_active_key = None
+                    await asyncio.sleep(2)
                     continue
-        
-        if not current_active_key:
-            yield json.dumps({"error": "Exhausted all failover keys"}).encode()
 
     # Determine media type: avoid hardcoding SSE if the client explicitly requested non-streaming
     try:
