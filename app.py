@@ -306,11 +306,18 @@ proxy_client = httpx.AsyncClient(timeout=120.0, follow_redirects=True)
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def smart_proxy(request: Request, path: str):
     # 1. Client Authentication
+    client_key = None
     auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return JSONResponse({"error": {"message": "Missing or invalid Authorization header"}}, status_code=401)
+    x_api_key = request.headers.get("x-api-key")
     
-    client_key = auth_header.split(" ")[1]
+    if auth_header and auth_header.startswith("Bearer "):
+        client_key = auth_header.split(" ")[1]
+    elif x_api_key:
+        client_key = x_api_key
+        
+    if not client_key:
+        return JSONResponse({"error": {"message": "Missing or invalid Authorization or x-api-key header"}}, status_code=401)
+    
     if not db.validate_client_key(client_key):
         return JSONResponse({"error": {"message": "Invalid or inactive client API key"}}, status_code=401)
 
