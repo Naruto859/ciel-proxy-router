@@ -175,132 +175,172 @@ class KeyManager:
 
 key_manager = KeyManager()
 
-# --- BACKGROUND TASK ---
-async def polling_worker():
-    while True:
-        logger.info("Background: Refreshing all keys...")
-        keys = db.get_keys()
-        for k in keys:
-            await key_manager.check_balance(k['key'])
-        
-        # Get interval from settings
-        with sqlite3.connect(DB_PATH) as conn:
-            row = conn.execute("SELECT value FROM settings WHERE name = 'polling_interval'").fetchone()
-            interval = int(row[0]) if row else 300
-        
-        await asyncio.sleep(interval)
+# --- TRANSLATION LAYER (Anthropic -> OpenAI) ---
+import json
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    worker = asyncio.create_task(polling_worker())
-    yield
-    worker.cancel()
-    await key_manager.client.aclose()
-
-app = FastAPI(lifespan=lifespan)
-templates = Jinja2Templates(directory="templates")
-security = HTTPBearer()
-
-# --- AUTH DEPENDENCY ---
-def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    if credentials.credentials != SESSION_TOKEN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid session")
-    return True
-
-# --- ADMIN API ---
-class AuthRequest(BaseModel):
-    pin: str
-
-@app.post("/admin/auth")
-async def admin_auth(req: AuthRequest):
-    if req.pin == db.get_admin_password():
-        return {"token": SESSION_TOKEN}
-    raise HTTPException(status_code=401, detail="Invalid Password")
-
-@app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-@app.get("/admin/keys", dependencies=[Depends(verify_token)])
-async def list_keys():
-    return {"keys": db.get_keys()}
-
-class KeyAddRequest(BaseModel):
-    key: str
-    priority: int = 0
-
-@app.post("/admin/keys", dependencies=[Depends(verify_token)])
-async def add_key(req: KeyAddRequest):
-    db.add_key(req.key, req.priority)
-    await key_manager.check_balance(req.key)
-    return {"success": True}
-
-@app.delete("/admin/keys/{key}", dependencies=[Depends(verify_token)])
-async def delete_key(key: str):
-    db.delete_key(key)
-    return {"success": True}
-
-@app.get("/admin/test/{key}", dependencies=[Depends(verify_token)])
-async def test_key(key: str):
-    balance = await key_manager.check_balance(key)
-    return {"success": balance >= 0, "balance": balance}
-
-# --- CLIENT KEYS API ---
-@app.get("/admin/client-keys", dependencies=[Depends(verify_token)])
-async def list_client_keys():
-    return {"keys": db.get_client_keys()}
-
-class ClientKeyAddRequest(BaseModel):
-    name: str
-
-@app.post("/admin/client-keys", dependencies=[Depends(verify_token)])
-async def add_client_key(req: ClientKeyAddRequest):
-    new_key = db.generate_client_key(req.name)
-    return {"success": True, "key": new_key}
-
-@app.delete("/admin/client-keys/{key}", dependencies=[Depends(verify_token)])
-async def delete_client_key(key: str):
-    db.revoke_client_key(key)
-    return {"success": True}
-
-# --- SETTINGS API ---
-class PasswordChangeRequest(BaseModel):
-    new_password: str
-
-@app.post("/admin/password", dependencies=[Depends(verify_token)])
-async def change_password(req: PasswordChangeRequest):
-    db.set_admin_password(req.new_password)
-    return {"success": True}
-
-# --- ANALYTICS API ---
-@app.get("/admin/analytics", dependencies=[Depends(verify_token)])
-async def get_analytics():
-    ist = timezone(timedelta(hours=5, minutes=30))
-    now = datetime.now(ist)
+def translate_anthropic_to_openai(body_json: dict) -> dict:
+    openai_body = {}
     
-    def get_count(start_time: str):
-        with sqlite3.connect(DB_PATH) as conn:
-            row = conn.execute("SELECT COUNT(*) FROM usage_stats WHERE timestamp >= ?", (start_time,)).fetchone()
-            return row[0] if row else 0
+    if "model" in body_json:
+        openai_body["model"] = body_json["model"]
+    if "max_tokens" in body_json:
+        openai_body["max_tokens"] = body_json["max_tokens"]
+    if "temperature" in body_json:
+        openai_body["temperature"] = body_json["temperature"]
+    if "stream" in body_json:
+        openai_body["stream"] = body_json["stream"]
 
-    today = (now - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
-    this_week = (now - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
-    this_month = (now - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
-    this_year = (now - timedelta(days=365)).strftime("%Y-%m-%d %H:%M:%S")
+    messages = []
+    if "system" in body_json:
+        system_content = body_json["system"]
+        if isinstance(system_content, list):
+            text_parts = [block.get("text", "") for block in system_content if block.get("type") == "text"]
+            messages.append({"role": "system", "content": "\n".join(text_parts)})
+        elif isinstance(system_content, str):
+            messages.append({"role": "system", "content": system_content})
 
-    return {
-        "today": get_count(today),
-        "this_week": get_count(this_week),
-        "this_month": get_count(this_month),
-        "this_year": get_count(this_year)
-    }
+    for msg in body_json.get("messages", []):
+        role = msg.get("role")
+        content = msg.get("content")
+        
+        if isinstance(content, str):
+            messages.append({"role": role, "content": content})
+            continue
+            
+        if isinstance(content, list):
+            openai_msg = {"role": role, "content": ""}
+            tool_calls = []
+            
+            for block in content:
+                block_type = block.get("type")
+                if block_type == "text":
+                    openai_msg["content"] += block.get("text", "")
+                elif block_type == "tool_use":
+                    tool_calls.append({
+                        "id": block.get("id"),
+                        "type": "function",
+                        "function": {
+                            "name": block.get("name"),
+                            "arguments": json.dumps(block.get("input", {}))
+                        }
+                    })
+                elif block_type == "tool_result":
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": block.get("tool_use_id"),
+                        "content": block.get("content", "")
+                    })
+            
+            if tool_calls:
+                openai_msg["tool_calls"] = tool_calls
+            if openai_msg["content"] or openai_msg.get("tool_calls"):
+                messages.append(openai_msg)
 
-# --- SYSTEM LOGS API ---
-@app.get("/admin/live_status", dependencies=[Depends(verify_token)])
-async def live_status():
-    return {"logs": list(system_logs)}
+    openai_body["messages"] = messages
+    
+    if "tools" in body_json:
+        openai_tools = []
+        for t in body_json["tools"]:
+            openai_tools.append({
+                "type": "function",
+                "function": {
+                    "name": t.get("name"),
+                    "description": t.get("description", ""),
+                    "parameters": t.get("input_schema", {})
+                }
+            })
+        openai_body["tools"] = openai_tools
 
-# --- THE SMART PROXY (SILENT FAILOVER) ---
+    return openai_body
+
+def translate_openai_to_anthropic_non_stream(openai_bytes: bytes) -> bytes:
+    try:
+        data = json.loads(openai_bytes.decode('utf-8'))
+        anthropic_resp = {
+            "id": data.get("id", "msg_mock"),
+            "type": "message",
+            "role": "assistant",
+            "content": [],
+            "model": data.get("model", "gpt-4"),
+            "stop_reason": "end_turn",
+            "stop_sequence": None,
+            "usage": {
+                "input_tokens": data.get("usage", {}).get("prompt_tokens", 0),
+                "output_tokens": data.get("usage", {}).get("completion_tokens", 0)
+            }
+        }
+        
+        choices = data.get("choices", [])
+        if choices:
+            msg = choices[0].get("message", {})
+            if "content" in msg and msg["content"]:
+                anthropic_resp["content"].append({
+                    "type": "text",
+                    "text": msg["content"]
+                })
+            if "tool_calls" in msg:
+                anthropic_resp["stop_reason"] = "tool_use"
+                for tc in msg["tool_calls"]:
+                    anthropic_resp["content"].append({
+                        "type": "tool_use",
+                        "id": tc.get("id"),
+                        "name": tc.get("function", {}).get("name"),
+                        "input": json.loads(tc.get("function", {}).get("arguments", "{}"))
+                    })
+                    
+        return json.dumps(anthropic_resp).encode('utf-8')
+    except Exception:
+        return openai_bytes
+
+def translate_openai_to_anthropic_stream(openai_chunk: bytes) -> bytes:
+    try:
+        chunk_str = openai_chunk.decode('utf-8')
+        if not chunk_str.startswith("data: ") or chunk_str.strip() == "data: [DONE]":
+            return openai_chunk
+            
+        data_json = json.loads(chunk_str[6:])
+        
+        anthropic_event = {
+            "type": "content_block_delta",
+            "delta": {
+                "type": "text_delta",
+                "text": ""
+            }
+        }
+        
+        choices = data_json.get("choices", [])
+        if choices:
+            delta = choices[0].get("delta", {})
+            if "content" in delta and delta["content"]:
+                anthropic_event["delta"]["text"] = delta["content"]
+                return f"data: {json.dumps(anthropic_event)}\n\n".encode('utf-8')
+            if "tool_calls" in delta:
+                tc = delta["tool_calls"][0]
+                if "id" in tc:
+                    event = {
+                        "type": "content_block_start",
+                        "content_block": {
+                            "type": "tool_use",
+                            "id": tc["id"],
+                            "name": tc["function"]["name"],
+                            "input": {}
+                        }
+                    }
+                    return f"data: {json.dumps(event)}\n\n".encode('utf-8')
+                elif "function" in tc and "arguments" in tc["function"]:
+                    event = {
+                        "type": "content_block_delta",
+                        "delta": {
+                            "type": "input_json_delta",
+                            "partial_json": tc["function"]["arguments"]
+                        }
+                    }
+                    return f"data: {json.dumps(event)}\n\n".encode('utf-8')
+        return openai_chunk
+    except Exception:
+        return openai_chunk
+
+# --- THE SMART PROXY (UNIVERSAL ADAPTER) ---
 proxy_client = httpx.AsyncClient(timeout=120.0, follow_redirects=True)
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
@@ -321,9 +361,24 @@ async def smart_proxy(request: Request, path: str):
     if not db.validate_client_key(client_key):
         return JSONResponse({"error": {"message": "Invalid or inactive client API key"}}, status_code=401)
 
-    url = f"{BASE_URL}/{path}"
-    body = await request.body()
+    # 2. Universal API Translation (Anthropic -> OpenAI)
+    is_anthropic = path.endswith("/v1/messages")
+    url = f"{BASE_URL}/openai/v1/chat/completions" if is_anthropic else f"{BASE_URL}/{path}"
     
+    raw_body = await request.body()
+    try:
+        body_json = json.loads(raw_body) if raw_body else {}
+    except:
+        body_json = {}
+
+    is_stream = body_json.get("stream", False)
+
+    if is_anthropic:
+        body_json = translate_anthropic_to_openai(body_json)
+        body = json.dumps(body_json).encode('utf-8')
+    else:
+        body = raw_body
+
     # Header Preservation for Vision and WAF Bypass:
     clean_headers = {
         "User-Agent": "curl/8.5.0",
@@ -334,12 +389,13 @@ async def smart_proxy(request: Request, path: str):
     for k, v in request.headers.items():
         k_lower = k.lower()
         if k_lower.startswith("x-") or k_lower in ["accept-encoding", "content-length", "content-type", "accept"]:
+            if is_anthropic and k_lower == "content-length":
+                continue
             clean_headers[k] = v
 
-    try:
-        is_stream = json.loads(body).get("stream", False) if body else False
-    except:
-        is_stream = False
+    if is_anthropic:
+        clean_headers["Content-Length"] = str(len(body))
+        clean_headers["Content-Type"] = "application/json"
 
     # Safety Wall & Retry Loop
     state = {"sent_keepalive": False}
@@ -402,8 +458,14 @@ async def smart_proxy(request: Request, path: str):
                     # For 400 (Vision/Payload errors) or 429 (Rate Limits), pass through and STOP
                     if response.status_code in (400, 429):
                         add_log(f"Upstream returned {response.status_code}. Passing through to client.")
-                        async for chunk in response.aiter_bytes():
-                            yield chunk
+                        if not is_stream and is_anthropic:
+                            full_resp = b""
+                            async for chunk in response.aiter_bytes():
+                                full_resp += chunk
+                            yield translate_openai_to_anthropic_non_stream(full_resp)
+                        else:
+                            async for chunk in response.aiter_bytes():
+                                yield translate_openai_to_anthropic_stream(chunk) if is_anthropic else chunk
                         await response.aclose()
                         return
 
@@ -415,10 +477,16 @@ async def smart_proxy(request: Request, path: str):
                         await asyncio.sleep(2)
                         continue
                     
-                    # Stream the actual response natively (no wrappers)
+                    # Stream the actual response natively (handling translation if needed)
                     try:
-                        async for chunk in response.aiter_bytes():
-                            yield chunk
+                        if not is_stream and is_anthropic:
+                            full_resp = b""
+                            async for chunk in response.aiter_bytes():
+                                full_resp += chunk
+                            yield translate_openai_to_anthropic_non_stream(full_resp)
+                        else:
+                            async for chunk in response.aiter_bytes():
+                                yield translate_openai_to_anthropic_stream(chunk) if is_anthropic else chunk
                     finally:
                         await response.aclose()
                     return # Successfully streamed
@@ -429,12 +497,6 @@ async def smart_proxy(request: Request, path: str):
                     await asyncio.sleep(2)
                     continue
 
-    # Determine media type: avoid hardcoding SSE if the client explicitly requested non-streaming
-    try:
-        is_stream = json.loads(body).get("stream", False) if body else False
-    except:
-        is_stream = False
-    
     # Determine media type: strictly respect the client's request
     media_type = "text/event-stream" if is_stream else "application/json"
 
