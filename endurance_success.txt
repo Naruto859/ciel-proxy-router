@@ -1,0 +1,1 @@
+SUCCESS: Hermes survived the 0-balance loop and completed the payload.

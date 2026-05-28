@@ -18,7 +18,7 @@ from collections import deque
 
 # --- CONFIGURATION ---
 DB_PATH = "proxy_data.db"
-BASE_URL = "https://gen.pollinations.ai"
+BASE_URL = "http://127.0.0.1:8084"
 SESSION_TOKEN = secrets.token_hex(16)
 
 # --- SYSTEM LOGS ---
@@ -300,118 +300,89 @@ async def get_analytics():
 async def live_status():
     return {"logs": list(system_logs)}
 
+# --- THE SMART PROXY (SILENT FAILOVER) ---
+proxy_client = httpx.AsyncClient(timeout=120.0, follow_redirects=True)
 
-# --- THE SMART PROXY (SIDECAR LITELLM & STRICT FAILOVER) ---
-proxy_client = httpx.AsyncClient(timeout=900.0, follow_redirects=True)
-
-async def core_proxy(request: Request, path: str):
+@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def smart_proxy(request: Request, path: str):
     # 1. Client Authentication
-    client_key = None
     auth_header = request.headers.get("Authorization")
-    x_api_key = request.headers.get("x-api-key")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return JSONResponse({"error": {"message": "Missing or invalid Authorization header"}}, status_code=401)
     
-    if auth_header and auth_header.startswith("Bearer "):
-        client_key = auth_header.split(" ")[1]
-    elif x_api_key:
-        client_key = x_api_key
-        
-    if not client_key:
-        return JSONResponse({"error": {"message": "Missing or invalid Authorization or x-api-key header"}}, status_code=401)
-    
+    client_key = auth_header.split(" ")[1]
     if not db.validate_client_key(client_key):
         return JSONResponse({"error": {"message": "Invalid or inactive client API key"}}, status_code=401)
 
-    is_anthropic = path.endswith("/v1/messages")
-    # Route Anthropic requests to local LiteLLM sidecar proxy on port 4000
-    url = "http://litellm:4000/v1/messages" if is_anthropic else f"{BASE_URL}/{path}"
+    url = f"{BASE_URL}/{path}"
+    body = await request.body()
     
-    raw_body = await request.body()
-    try:
-        body_json = json.loads(raw_body) if raw_body else {}
-    except:
-        body_json = {}
-
-    is_stream = body_json.get("stream", False)
-
+    # Header Preservation for Vision and WAF Bypass:
     clean_headers = {
         "User-Agent": "curl/8.5.0",
         "Accept": "*/*"
     }
     
+    # Forward critical headers (including Vision support)
     for k, v in request.headers.items():
         k_lower = k.lower()
-        if k_lower.startswith("x-") or k_lower in ["accept-encoding", "content-length", "content-type", "accept", "anthropic-version"]:
+        if k_lower.startswith("x-") or k_lower in ["accept-encoding", "content-length", "content-type", "accept"]:
             clean_headers[k] = v
 
-    # Ensure Content-Type is correct
-    if is_anthropic and "Content-Type" not in clean_headers:
-        clean_headers["Content-Type"] = "application/json"
+    try:
+        is_stream = json.loads(body).get("stream", False) if body else False
+    except:
+        is_stream = False
 
+    # Internal Retry Loop for Silent Failover
+    max_internal_retries = 5
+    
     async def generate_with_keepalive():
-        async with balance_check_lock:
-            await key_manager.force_pull_balances()
-            
         current_active_key = None
-        
-        while True:
+        for attempt in range(max_internal_retries):
             current_active_key = await key_manager.get_best_key()
             
             if not current_active_key:
-                add_log("No active keys available (Balance 0.00). Entering Safety Wall Wait Loop...")
-                wait_counter = 0
+                add_log(f"No active keys (Attempt {attempt+1}). Checking balances...")
+                async with balance_check_lock:
+                    await key_manager.force_pull_balances()
+                current_active_key = await key_manager.get_best_key()
+                
                 while not current_active_key:
-                    if is_stream:
-                        if is_anthropic:
-                            yield b'event: ping
-data: {"type": "ping"}
-
-'
-                        else:
-                            yield b":
-
-"
-                    else:
-                        yield b" "
-                        
-                    await asyncio.sleep(15)
-                    wait_counter += 1
-                    
-                    if wait_counter % 20 == 0:
-                        add_log("WAIT mode: Refreshing balances...")
-                        async with balance_check_lock:
-                            await key_manager.force_pull_balances()
-                        current_active_key = await key_manager.get_best_key()
-                        if current_active_key:
-                            add_log("Balance detected. Resuming request...")
-                            break
+                    # 100% Silent 300s wait loop for ALL requests (prevents parser crashes)
+                    await asyncio.sleep(300)
+                    add_log("WAIT mode: Refreshing balances...")
+                    async with balance_check_lock:
+                        await key_manager.force_pull_balances()
+                    current_active_key = await key_manager.get_best_key()
+                    if current_active_key:
+                        add_log("Balance detected. Resuming request...")
+                        break
             
             if current_active_key:
-                # Add upstream auth key. LiteLLM proxy uses this as the upstream key.
                 clean_headers["Authorization"] = f"Bearer {current_active_key}"
-                
                 try:
-                    if is_anthropic:
-                        add_log(f"Routing Anthropic request via Sidecar LiteLLM using key {current_active_key[:10]}...")
-                        
                     proxy_req = proxy_client.build_request(
                         method=request.method,
                         url=url,
                         headers=clean_headers,
-                        content=raw_body,
+                        content=body,
                         params=request.query_params
                     )
                     
                     response = await proxy_client.send(proxy_req, stream=True)
                     db.log_usage(path, response.status_code)
                     
+                    # Handle specific error codes: only drain on auth/balance errors
                     if response.status_code in (401, 402, 403):
-                        add_log(f"Key {current_active_key[:10]} failed with {response.status_code}. Draining and shifting to NEXT key...")
+                        add_log(f"Key {current_active_key[:10]} failed with {response.status_code}. Draining and Retrying...")
                         await response.aread()
                         await response.aclose()
                         db.update_balance(current_active_key, 0.0)
                         current_active_key = None
                         continue
 
+                    # For 400 (Vision/Payload errors) or 429 (Rate Limits), pass through and STOP
                     if response.status_code in (400, 429):
                         add_log(f"Upstream returned {response.status_code}. Passing through to client.")
                         async for chunk in response.aiter_bytes():
@@ -424,37 +395,32 @@ data: {"type": "ping"}
                         await response.aread()
                         await response.aclose()
                         current_active_key = None
-                        await asyncio.sleep(2)
                         continue
                     
+                    # Stream the actual response natively (no wrappers)
                     try:
                         async for chunk in response.aiter_bytes():
                             yield chunk
                     finally:
                         await response.aclose()
-                    return
+                    return # Successfully streamed
 
                 except Exception as e:
-                    logger.error(f"Proxy attempt failed: {e}")
+                    logger.error(f"Proxy attempt {attempt} failed: {e}")
                     current_active_key = None
-                    await asyncio.sleep(2)
                     continue
+        
+        if not current_active_key:
+            yield json.dumps({"error": "Exhausted all failover keys"}).encode()
 
+    # Determine media type: avoid hardcoding SSE if the client explicitly requested non-streaming
+    try:
+        is_stream = json.loads(body).get("stream", False) if body else False
+    except:
+        is_stream = False
+    
+    # Determine media type: strictly respect the client's request
     media_type = "text/event-stream" if is_stream else "application/json"
+
     return StreamingResponse(generate_with_keepalive(), status_code=200, media_type=media_type)
 
-@app.api_route("/openai/v1/chat/completions", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def openai_proxy_direct(request: Request):
-    return await core_proxy(request, "openai/v1/chat/completions")
-
-@app.api_route("/v1/chat/completions", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def openai_proxy(request: Request):
-    return await core_proxy(request, "v1/chat/completions")
-
-@app.api_route("/v1/messages", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def anthropic_proxy(request: Request):
-    return await core_proxy(request, "v1/messages")
-
-@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def catch_all_proxy(request: Request, path: str):
-    return await core_proxy(request, path)

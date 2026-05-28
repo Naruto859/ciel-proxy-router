@@ -14,3 +14,14 @@ services:
         max-size: "10m"
         max-file: "3"
     restart: unless-stopped
+    depends_on:
+      - litellm
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+    command: [ "--config", "/app/config.yaml", "--port", "4000", "--drop_params" ]
+    restart: unless-stopped
