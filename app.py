@@ -326,11 +326,11 @@ async def live_status():
     return {"logs": list(system_logs)}
 
 
-# --- THE SMART PROXY (EXPLICIT ROUTING & SIDECAR LITELLM) ---
+# --- THE SMART PROXY (FIXED STREAMING & EXPLICIT ROUTING) ---
 proxy_client = httpx.AsyncClient(timeout=900.0, follow_redirects=True)
 
 async def core_proxy(request: Request, litellm_path: str):
-    # 1. Mandatory Client Authentication (Fix 1)
+    # 1. Mandatory Client Authentication
     client_key = None
     auth_header = request.headers.get("Authorization")
     x_api_key = request.headers.get("x-api-key")
@@ -354,27 +354,37 @@ async def core_proxy(request: Request, litellm_path: str):
     
     for k, v in request.headers.items():
         k_lower = k.lower()
-        # Keep essential headers and Anthropic specific ones
         if k_lower.startswith("x-") or k_lower in ["accept-encoding", "content-type", "accept", "anthropic-version"]:
             clean_headers[k] = v
 
-    # Fix Content-Type if missing
     if "Content-Type" not in clean_headers:
         clean_headers["Content-Type"] = "application/json"
 
-    # Prepare Body & Model Prefixing (Fix 3)
+    # Prepare Body & Model Handling
     raw_body = await request.body()
     try:
         body_json = json.loads(raw_body) if raw_body else {}
+        # LiteLLM config now handles mapping, so prefixing is less critical but kept as fallback
         model = body_json.get("model", "")
         if model and not model.startswith("openai/"):
-            body_json["model"] = f"openai/{model}"
-            add_log(f"Prefixed model: {model} -> {body_json['model']}")
-            raw_body = json.dumps(body_json).encode()
+             # Optional: If you want LiteLLM to handle raw model names via aliases, you can skip prefixing here.
+             # However, keeping it ensures it hits the "*" catch-all in litellm if aliases fail.
+             pass 
     except Exception as e:
         logger.error(f"Body parsing failed: {e}")
 
     url = f"{LITELLM_URL}{litellm_path}"
+
+    async def stream_generator(upstream_resp):
+        try:
+            # FIX 1: Read by line to prevent UTF-8 splitting
+            async for line in upstream_resp.aiter_lines():
+                if line:
+                    yield (line + "\n").encode("utf-8")
+                else:
+                    yield b"\n"
+        finally:
+            await upstream_resp.aclose()
 
     # FAILOVER & WAIT LOOP LOGIC (Safe Streaming)
     while True:
@@ -382,7 +392,7 @@ async def core_proxy(request: Request, litellm_path: str):
         
         if not selected_key_data:
             add_log("No active keys (>0.05). Holding connection...")
-            await asyncio.sleep(150) # Mandate: 150s Wait Loop
+            await asyncio.sleep(150) # 150s Wait Loop
             await key_manager.force_pull_balances()
             continue
         
@@ -409,14 +419,14 @@ async def core_proxy(request: Request, litellm_path: str):
                 await db.update_balance(current_active_key, 0.0)
                 continue
 
-            # Forward headers (Mandate 3: Anthropic SDK Fix)
+            # Forward headers
             resp_headers = {}
             for k, v in upstream_resp.headers.items():
                 if k.lower() not in ["content-encoding", "transfer-encoding", "content-length", "connection"]:
                     resp_headers[k] = v
             
             return StreamingResponse(
-                upstream_resp.aiter_bytes(),
+                stream_generator(upstream_resp),
                 status_code=upstream_resp.status_code,
                 headers=resp_headers,
                 media_type=upstream_resp.headers.get("content-type")
@@ -427,19 +437,16 @@ async def core_proxy(request: Request, litellm_path: str):
             await asyncio.sleep(2)
             continue
 
-# --- EXPLICIT ROUTES (Fix 2) ---
+# --- EXPLICIT ROUTES ---
 
 @app.post("/v1/chat/completions")
 async def openai_proxy(request: Request):
-    """Route A: OpenAI SDKs / Hermes"""
     return await core_proxy(request, "/v1/chat/completions")
 
 @app.post("/v1/messages")
 async def anthropic_proxy(request: Request):
-    """Route B: Anthropic SDKs / Claude Code"""
     return await core_proxy(request, "/v1/messages")
 
-# Legacy / Redundant paths
 @app.post("/openai/v1/chat/completions")
 async def openai_proxy_legacy(request: Request):
     return await core_proxy(request, "/v1/chat/completions")

@@ -1,4 +1,16 @@
 model_list:
+  - model_name: "deepseek"
+    litellm_params:
+      model: "openai/deepseek"
+      api_base: "https://gen.pollinations.ai/v1"
+  - model_name: "qwen-large"
+    litellm_params:
+      model: "openai/qwen-large"
+      api_base: "https://gen.pollinations.ai/v1"
+  - model_name: "hermes"
+    litellm_params:
+      model: "openai/hermes"
+      api_base: "https://gen.pollinations.ai/v1"
   - model_name: "*"
     litellm_params:
       model: "openai/*"
