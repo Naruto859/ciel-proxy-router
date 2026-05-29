@@ -378,7 +378,7 @@ async def core_proxy(request: Request, path: str):
             add_log("No active keys (>0.05). Holding connection...")
             # If we haven't returned the response yet, this just pauses the request.
             # Client stays in 'pending' state.
-            await asyncio.sleep(15)
+            await asyncio.sleep(150)
             await key_manager.force_pull_balances()
             continue
         
