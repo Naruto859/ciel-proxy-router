@@ -325,17 +325,19 @@ async def live_status():
     return {"logs": list(system_logs)}
 
 
-# --- THE STANDALONE DIRECT PROXY ---
+# --- THE SMART DIRECT PROXY ---
 proxy_client = httpx.AsyncClient(timeout=900.0, follow_redirects=True)
 
 # ---------------------------------------------------------
-# ANTHROPIC TO OPENAI TRANSLATORS
+# ANTHROPIC TO OPENAI TRANSLATORS (Standalone)
 # ---------------------------------------------------------
 def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
     """Translates Anthropic JSON payload to OpenAI JSON payload"""
+    model = anthropic_json.get("model", "openai")
+    # Native Pollinations expects simple model names
     openai_json = {
-        "model": anthropic_json.get("model", "deepseek"),
-        "max_tokens": anthropic_json.get("max_tokens", 1000),
+        "model": model,
+        "max_tokens": anthropic_json.get("max_tokens", 1024),
         "stream": anthropic_json.get("stream", False),
         "messages": []
     }
@@ -348,17 +350,17 @@ def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
     return openai_json
 
 def translate_openai_resp_to_anthropic(openai_json: dict) -> dict:
-    """Translates OpenAI JSON response to Anthropic JSON response"""
+    """Translates OpenAI ChatCompletion response to Anthropic Message response"""
     content = ""
     if "choices" in openai_json and len(openai_json["choices"]) > 0:
         msg = openai_json["choices"][0].get("message", {})
         content = msg.get("content", "")
         
     return {
-        "id": openai_json.get("id", "msg_123"),
+        "id": openai_json.get("id", "msg_" + secrets.token_hex(8)),
         "type": "message",
         "role": "assistant",
-        "model": openai_json.get("model", "deepseek"),
+        "model": openai_json.get("model", "openai"),
         "content": [{"type": "text", "text": content}],
         "stop_reason": "end_turn",
         "stop_sequence": None,
@@ -366,13 +368,14 @@ def translate_openai_resp_to_anthropic(openai_json: dict) -> dict:
     }
 
 async def stream_openai_to_anthropic(upstream_resp, original_model):
-    """Translates OpenAI SSE to Anthropic SSE"""
+    """Translates OpenAI SSE to Anthropic SSE for Claude SDK stability"""
     try:
         # yield message_start
+        msg_id = "msg_" + secrets.token_hex(8)
         start_msg = {
             "type": "message_start", 
             "message": {
-                "id": "msg_1", 
+                "id": msg_id, 
                 "type": "message", 
                 "role": "assistant", 
                 "content": [], 
@@ -424,7 +427,7 @@ async def stream_openai_to_anthropic(upstream_resp, original_model):
 
 
 async def stream_openai_passthrough(upstream_resp):
-    """Clean UTF-8 safe passthrough for OpenAI"""
+    """Clean byte-level passthrough to avoid UTF-8 decoding errors in Hermes"""
     try:
         async for chunk in upstream_resp.aiter_bytes():
             yield chunk
@@ -433,7 +436,7 @@ async def stream_openai_passthrough(upstream_resp):
 
 
 # ---------------------------------------------------------
-# CORE PROXY HANDLER (DIRECT TO POLLINATIONS)
+# CORE PROXY HANDLER (DIRECT PASS-THRU TO POLLINATIONS)
 # ---------------------------------------------------------
 async def core_proxy(request: Request, is_anthropic: bool = False):
     # 1. Mandatory Client Authentication
@@ -452,14 +455,14 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
     if not await db.validate_client_key(client_key):
         return JSONResponse({"error": {"message": "Invalid client API key"}}, status_code=401)
 
-    # Prepare Headers
+    # 2. Header Preparation
     clean_headers = {
         "User-Agent": "curl/8.5.0",
         "Accept": "*/*",
         "Content-Type": "application/json"
     }
     
-    # Prepare Body
+    # 3. Payload Preparation
     raw_body = await request.body()
     try:
         body_json = json.loads(raw_body) if raw_body else {}
@@ -468,17 +471,17 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
         return JSONResponse({"error": {"message": "Invalid JSON"}}, status_code=400)
         
     is_stream = body_json.get("stream", False)
-    original_model = body_json.get("model", "deepseek")
+    original_model = body_json.get("model", "openai")
     
-    # Translate Anthropic requests to OpenAI format
+    # 4. Translation Layer (Anthropic -> OpenAI)
     if is_anthropic:
         body_json = translate_anthropic_req_to_openai(body_json)
         raw_body = json.dumps(body_json).encode("utf-8")
 
-    # DIRECT ROUTE TO POLLINATIONS (Bypassing LiteLLM)
+    # DIRECT UPSTREAM TARGET
     url = f"{BASE_URL}/v1/chat/completions"
 
-    # FAILOVER & WAIT LOOP LOGIC
+    # 5. FAILOVER & WAIT LOOP LOGIC
     while True:
         selected_key_data = await key_manager.get_best_key()
         
@@ -489,7 +492,7 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
             continue
         
         current_active_key = selected_key_data['key']
-        # Forward the actual API key to Pollinations
+        # FIX: CRITICAL AUTH OVERWRITE
         clean_headers["Authorization"] = f"Bearer {current_active_key}"
         
         try:
@@ -504,7 +507,7 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
             upstream_resp = await proxy_client.send(proxy_req, stream=is_stream)
             await db.log_usage("/v1/chat/completions", upstream_resp.status_code)
             
-            # Key Failure check
+            # Ban protection / Shifting
             if upstream_resp.status_code in (401, 402, 403):
                 add_log(f"Key {current_active_key[:10]} fail {upstream_resp.status_code}. Shifting...")
                 await upstream_resp.aread()
@@ -514,9 +517,10 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
 
             resp_headers = {"Content-Type": upstream_resp.headers.get("content-type", "application/json")}
             
+            # 6. Response Handlers
             if is_stream:
                 if is_anthropic:
-                    # Translate SSE
+                    # Translate OpenAI SSE to Anthropic SSE
                     return StreamingResponse(
                         stream_openai_to_anthropic(upstream_resp, original_model),
                         status_code=upstream_resp.status_code,
@@ -524,7 +528,7 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
                         media_type="text/event-stream"
                     )
                 else:
-                    # Pure Passthrough OpenAI SSE
+                    # Pure Byte Passthrough for Hermes stability
                     return StreamingResponse(
                         stream_openai_passthrough(upstream_resp),
                         status_code=upstream_resp.status_code,
@@ -532,7 +536,7 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
                         media_type="text/event-stream"
                     )
             else:
-                # Non-streaming Response
+                # Synchronous Response (Hermes title-gen Fix)
                 content_bytes = await upstream_resp.aread()
                 await upstream_resp.aclose()
                 
@@ -558,10 +562,12 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
 
 # --- EXPLICIT ROUTES ---
 
-@app.post("/v1/chat/completions")
-async def openai_proxy(request: Request):
-    return await core_proxy(request, is_anthropic=False)
-
 @app.post("/v1/messages")
 async def anthropic_proxy(request: Request):
+    """Route for Anthropic SDK / Claude Code"""
     return await core_proxy(request, is_anthropic=True)
+
+@app.post("/v1/chat/completions")
+async def openai_proxy(request: Request):
+    """Route for OpenAI SDK / Hermes Agent"""
+    return await core_proxy(request, is_anthropic=False)
