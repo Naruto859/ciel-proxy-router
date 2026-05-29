@@ -20,7 +20,6 @@ from collections import deque
 # --- CONFIGURATION ---
 DB_PATH = "proxy_data.db"
 BASE_URL = "https://gen.pollinations.ai"
-LITELLM_URL = "http://litellm:4000"
 SESSION_TOKEN = secrets.token_hex(16)
 
 # --- SYSTEM LOGS ---
@@ -161,7 +160,7 @@ class DatabaseManager:
 
 db = DatabaseManager(DB_PATH)
 
-# --- PROXY LOGIC ---
+# --- KEY MANAGER ---
 class KeyManager:
     def __init__(self):
         self.client = httpx.AsyncClient(timeout=30.0)
@@ -326,7 +325,7 @@ async def live_status():
     return {"logs": list(system_logs)}
 
 
-# --- THE SMART PROXY ---
+# --- THE STANDALONE DIRECT PROXY ---
 proxy_client = httpx.AsyncClient(timeout=900.0, follow_redirects=True)
 
 # ---------------------------------------------------------
@@ -427,14 +426,14 @@ async def stream_openai_to_anthropic(upstream_resp, original_model):
 async def stream_openai_passthrough(upstream_resp):
     """Clean UTF-8 safe passthrough for OpenAI"""
     try:
-        async for line in upstream_resp.aiter_lines():
-            yield (line + "\n").encode("utf-8")
+        async for chunk in upstream_resp.aiter_bytes():
+            yield chunk
     finally:
         await upstream_resp.aclose()
 
 
 # ---------------------------------------------------------
-# CORE PROXY HANDLER
+# CORE PROXY HANDLER (DIRECT TO POLLINATIONS)
 # ---------------------------------------------------------
 async def core_proxy(request: Request, is_anthropic: bool = False):
     # 1. Mandatory Client Authentication
@@ -471,13 +470,13 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
     is_stream = body_json.get("stream", False)
     original_model = body_json.get("model", "deepseek")
     
-    # Translate Anthropic requests to OpenAI format to bypass LiteLLM's broken Anthropic proxy
+    # Translate Anthropic requests to OpenAI format
     if is_anthropic:
         body_json = translate_anthropic_req_to_openai(body_json)
         raw_body = json.dumps(body_json).encode("utf-8")
 
-    # ALWAYS forward to LiteLLM's /v1/chat/completions to avoid Anthropic bugs in LiteLLM
-    url = f"{LITELLM_URL}/v1/chat/completions"
+    # DIRECT ROUTE TO POLLINATIONS (Bypassing LiteLLM)
+    url = f"{BASE_URL}/v1/chat/completions"
 
     # FAILOVER & WAIT LOOP LOGIC
     while True:
@@ -490,6 +489,7 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
             continue
         
         current_active_key = selected_key_data['key']
+        # Forward the actual API key to Pollinations
         clean_headers["Authorization"] = f"Bearer {current_active_key}"
         
         try:
@@ -524,7 +524,7 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
                         media_type="text/event-stream"
                     )
                 else:
-                    # Passthrough OpenAI SSE cleanly line-by-line
+                    # Pure Passthrough OpenAI SSE
                     return StreamingResponse(
                         stream_openai_passthrough(upstream_resp),
                         status_code=upstream_resp.status_code,
@@ -558,10 +558,10 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
 
 # --- EXPLICIT ROUTES ---
 
-@app.post("/v1/messages")
-async def anthropic_proxy(request: Request):
-    return await core_proxy(request, is_anthropic=True)
-
 @app.post("/v1/chat/completions")
 async def openai_proxy(request: Request):
     return await core_proxy(request, is_anthropic=False)
+
+@app.post("/v1/messages")
+async def anthropic_proxy(request: Request):
+    return await core_proxy(request, is_anthropic=True)
