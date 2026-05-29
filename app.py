@@ -342,10 +342,17 @@ def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
         "messages": []
     }
     if "system" in anthropic_json and anthropic_json["system"]:
-        openai_json["messages"].append({"role": "system", "content": anthropic_json["system"]})
+        sys_content = anthropic_json["system"]
+        if isinstance(sys_content, list):
+            sys_content = "".join([block.get("text", "") for block in sys_content if block.get("type") == "text"])
+        openai_json["messages"].append({"role": "system", "content": sys_content})
         
     for msg in anthropic_json.get("messages", []):
-        openai_json["messages"].append(msg)
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if isinstance(content, list):
+            content = "".join([block.get("text", "") for block in content if block.get("type") == "text"])
+        openai_json["messages"].append({"role": role, "content": content})
         
     return openai_json
 
@@ -518,7 +525,7 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
             resp_headers = {"Content-Type": upstream_resp.headers.get("content-type", "application/json")}
             
             # 6. Response Handlers
-            if is_stream:
+            if is_stream and upstream_resp.status_code == 200:
                 if is_anthropic:
                     # Translate OpenAI SSE to Anthropic SSE
                     return StreamingResponse(
@@ -536,7 +543,7 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
                         media_type="text/event-stream"
                     )
             else:
-                # Synchronous Response (Hermes title-gen Fix)
+                # Synchronous Response or Error Response
                 content_bytes = await upstream_resp.aread()
                 await upstream_resp.aclose()
                 
