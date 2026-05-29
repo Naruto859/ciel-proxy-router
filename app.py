@@ -362,14 +362,9 @@ async def core_proxy(request: Request, path: str):
                 while not current_active_key:
                     if is_stream:
                         if is_anthropic:
-                            yield b'event: ping
-data: {"type": "ping"}
-
-'
+                            yield b'event: ping\ndata: {"type": "ping"}\n\n'
                         else:
-                            yield b":
-
-"
+                            yield b":\n\n"
                     else:
                         yield b" "
                         
