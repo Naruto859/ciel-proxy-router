@@ -558,14 +558,10 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
 
 # --- EXPLICIT ROUTES ---
 
-@app.post("/v1/chat/completions")
-async def openai_proxy(request: Request):
-    return await core_proxy(request, is_anthropic=False)
-
 @app.post("/v1/messages")
 async def anthropic_proxy(request: Request):
     return await core_proxy(request, is_anthropic=True)
 
-@app.post("/openai/v1/chat/completions")
-async def openai_proxy_legacy(request: Request):
+@app.post("/v1/chat/completions")
+async def openai_proxy(request: Request):
     return await core_proxy(request, is_anthropic=False)
