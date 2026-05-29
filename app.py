@@ -563,11 +563,21 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
 # --- EXPLICIT ROUTES ---
 
 @app.post("/v1/messages")
+@app.post("/v1/v1/messages")
 async def anthropic_proxy(request: Request):
     """Route for Anthropic SDK / Claude Code"""
     return await core_proxy(request, is_anthropic=True)
 
 @app.post("/v1/chat/completions")
+@app.post("/v1/v1/chat/completions")
 async def openai_proxy(request: Request):
     """Route for OpenAI SDK / Hermes Agent"""
     return await core_proxy(request, is_anthropic=False)
+
+@app.get("/v1/models")
+@app.get("/v1/v1/models")
+async def list_models_proxy():
+    """Route for Model Discovery"""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(f"{BASE_URL}/v1/models")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
