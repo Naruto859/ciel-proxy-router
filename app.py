@@ -8,7 +8,7 @@ import bcrypt
 from typing import List, Dict, Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Depends, HTTPException, status
+from fastapi import FastAPI, Request, Depends, HTTPException, status, Response
 from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.templating import Jinja2Templates
@@ -326,10 +326,117 @@ async def live_status():
     return {"logs": list(system_logs)}
 
 
-# --- THE SMART PROXY (FIXED STREAMING & EXPLICIT ROUTING) ---
+# --- THE SMART PROXY ---
 proxy_client = httpx.AsyncClient(timeout=900.0, follow_redirects=True)
 
-async def core_proxy(request: Request, litellm_path: str):
+# ---------------------------------------------------------
+# ANTHROPIC TO OPENAI TRANSLATORS
+# ---------------------------------------------------------
+def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
+    """Translates Anthropic JSON payload to OpenAI JSON payload"""
+    openai_json = {
+        "model": anthropic_json.get("model", "deepseek"),
+        "max_tokens": anthropic_json.get("max_tokens", 1000),
+        "stream": anthropic_json.get("stream", False),
+        "messages": []
+    }
+    if "system" in anthropic_json and anthropic_json["system"]:
+        openai_json["messages"].append({"role": "system", "content": anthropic_json["system"]})
+        
+    for msg in anthropic_json.get("messages", []):
+        openai_json["messages"].append(msg)
+        
+    return openai_json
+
+def translate_openai_resp_to_anthropic(openai_json: dict) -> dict:
+    """Translates OpenAI JSON response to Anthropic JSON response"""
+    content = ""
+    if "choices" in openai_json and len(openai_json["choices"]) > 0:
+        msg = openai_json["choices"][0].get("message", {})
+        content = msg.get("content", "")
+        
+    return {
+        "id": openai_json.get("id", "msg_123"),
+        "type": "message",
+        "role": "assistant",
+        "model": openai_json.get("model", "deepseek"),
+        "content": [{"type": "text", "text": content}],
+        "stop_reason": "end_turn",
+        "stop_sequence": None,
+        "usage": {"input_tokens": 0, "output_tokens": 0}
+    }
+
+async def stream_openai_to_anthropic(upstream_resp, original_model):
+    """Translates OpenAI SSE to Anthropic SSE"""
+    try:
+        # yield message_start
+        start_msg = {
+            "type": "message_start", 
+            "message": {
+                "id": "msg_1", 
+                "type": "message", 
+                "role": "assistant", 
+                "content": [], 
+                "model": original_model, 
+                "stop_reason": None, 
+                "stop_sequence": None, 
+                "usage": {"input_tokens": 0, "output_tokens": 0}
+            }
+        }
+        yield f'event: message_start\ndata: {json.dumps(start_msg)}\n\n'.encode("utf-8")
+        
+        block_start = {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}}
+        yield f'event: content_block_start\ndata: {json.dumps(block_start)}\n\n'.encode("utf-8")
+        
+        async for line in upstream_resp.aiter_lines():
+            line = line.strip()
+            if not line or not line.startswith("data: "):
+                continue
+            data_str = line[6:]
+            if data_str == "[DONE]":
+                break
+            try:
+                data_json = json.loads(data_str)
+                choices = data_json.get("choices", [])
+                if choices:
+                    delta = choices[0].get("delta", {})
+                    if "content" in delta and delta["content"]:
+                        anthropic_delta = {
+                            "type": "content_block_delta",
+                            "index": 0,
+                            "delta": {
+                                "type": "text_delta",
+                                "text": delta["content"]
+                            }
+                        }
+                        yield f'event: content_block_delta\ndata: {json.dumps(anthropic_delta)}\n\n'.encode("utf-8")
+            except json.JSONDecodeError:
+                continue
+                
+        block_stop = {"type": "content_block_stop", "index": 0}
+        yield f'event: content_block_stop\ndata: {json.dumps(block_stop)}\n\n'.encode("utf-8")
+        
+        msg_delta = {"type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": None}, "usage": {"output_tokens": 10}}
+        yield f'event: message_delta\ndata: {json.dumps(msg_delta)}\n\n'.encode("utf-8")
+        
+        yield b'event: message_stop\ndata: {"type": "message_stop"}\n\n'
+    finally:
+        await upstream_resp.aclose()
+
+
+async def stream_openai_passthrough(upstream_resp):
+    """Clean UTF-8 safe passthrough for OpenAI"""
+    try:
+        async for line in upstream_resp.aiter_lines():
+            yield (line + "\n").encode("utf-8")
+    finally:
+        await upstream_resp.aclose()
+
+
+# ---------------------------------------------------------
+# CORE PROXY HANDLER
+# ---------------------------------------------------------
+async def core_proxy(request: Request, is_anthropic: bool = False):
     # 1. Mandatory Client Authentication
     client_key = None
     auth_header = request.headers.get("Authorization")
@@ -349,44 +456,30 @@ async def core_proxy(request: Request, litellm_path: str):
     # Prepare Headers
     clean_headers = {
         "User-Agent": "curl/8.5.0",
-        "Accept": "*/*"
+        "Accept": "*/*",
+        "Content-Type": "application/json"
     }
     
-    for k, v in request.headers.items():
-        k_lower = k.lower()
-        if k_lower.startswith("x-") or k_lower in ["accept-encoding", "content-type", "accept", "anthropic-version"]:
-            clean_headers[k] = v
-
-    if "Content-Type" not in clean_headers:
-        clean_headers["Content-Type"] = "application/json"
-
-    # Prepare Body & Model Handling
+    # Prepare Body
     raw_body = await request.body()
     try:
         body_json = json.loads(raw_body) if raw_body else {}
-        # LiteLLM config now handles mapping, so prefixing is less critical but kept as fallback
-        model = body_json.get("model", "")
-        if model and not model.startswith("openai/"):
-             # Optional: If you want LiteLLM to handle raw model names via aliases, you can skip prefixing here.
-             # However, keeping it ensures it hits the "*" catch-all in litellm if aliases fail.
-             pass 
     except Exception as e:
         logger.error(f"Body parsing failed: {e}")
+        return JSONResponse({"error": {"message": "Invalid JSON"}}, status_code=400)
+        
+    is_stream = body_json.get("stream", False)
+    original_model = body_json.get("model", "deepseek")
+    
+    # Translate Anthropic requests to OpenAI format to bypass LiteLLM's broken Anthropic proxy
+    if is_anthropic:
+        body_json = translate_anthropic_req_to_openai(body_json)
+        raw_body = json.dumps(body_json).encode("utf-8")
 
-    url = f"{LITELLM_URL}{litellm_path}"
+    # ALWAYS forward to LiteLLM's /v1/chat/completions to avoid Anthropic bugs in LiteLLM
+    url = f"{LITELLM_URL}/v1/chat/completions"
 
-    async def stream_generator(upstream_resp):
-        try:
-            # FIX 1: Read by line to prevent UTF-8 splitting
-            async for line in upstream_resp.aiter_lines():
-                if line:
-                    yield (line + "\n").encode("utf-8")
-                else:
-                    yield b"\n"
-        finally:
-            await upstream_resp.aclose()
-
-    # FAILOVER & WAIT LOOP LOGIC (Safe Streaming)
+    # FAILOVER & WAIT LOOP LOGIC
     while True:
         selected_key_data = await key_manager.get_best_key()
         
@@ -401,15 +494,15 @@ async def core_proxy(request: Request, litellm_path: str):
         
         try:
             proxy_req = proxy_client.build_request(
-                method=request.method,
+                method="POST",
                 url=url,
                 headers=clean_headers,
                 content=raw_body,
                 params=request.query_params
             )
             
-            upstream_resp = await proxy_client.send(proxy_req, stream=True)
-            await db.log_usage(litellm_path, upstream_resp.status_code)
+            upstream_resp = await proxy_client.send(proxy_req, stream=is_stream)
+            await db.log_usage("/v1/chat/completions", upstream_resp.status_code)
             
             # Key Failure check
             if upstream_resp.status_code in (401, 402, 403):
@@ -419,18 +512,44 @@ async def core_proxy(request: Request, litellm_path: str):
                 await db.update_balance(current_active_key, 0.0)
                 continue
 
-            # Forward headers
-            resp_headers = {}
-            for k, v in upstream_resp.headers.items():
-                if k.lower() not in ["content-encoding", "transfer-encoding", "content-length", "connection"]:
-                    resp_headers[k] = v
+            resp_headers = {"Content-Type": upstream_resp.headers.get("content-type", "application/json")}
             
-            return StreamingResponse(
-                stream_generator(upstream_resp),
-                status_code=upstream_resp.status_code,
-                headers=resp_headers,
-                media_type=upstream_resp.headers.get("content-type")
-            )
+            if is_stream:
+                if is_anthropic:
+                    # Translate SSE
+                    return StreamingResponse(
+                        stream_openai_to_anthropic(upstream_resp, original_model),
+                        status_code=upstream_resp.status_code,
+                        headers=resp_headers,
+                        media_type="text/event-stream"
+                    )
+                else:
+                    # Passthrough OpenAI SSE cleanly line-by-line
+                    return StreamingResponse(
+                        stream_openai_passthrough(upstream_resp),
+                        status_code=upstream_resp.status_code,
+                        headers=resp_headers,
+                        media_type="text/event-stream"
+                    )
+            else:
+                # Non-streaming Response
+                content_bytes = await upstream_resp.aread()
+                await upstream_resp.aclose()
+                
+                if is_anthropic:
+                    try:
+                        openai_resp_json = json.loads(content_bytes)
+                        anthropic_resp_json = translate_openai_resp_to_anthropic(openai_resp_json)
+                        return JSONResponse(anthropic_resp_json, status_code=upstream_resp.status_code, headers=resp_headers)
+                    except json.JSONDecodeError:
+                        return Response(content=content_bytes, status_code=upstream_resp.status_code, headers=resp_headers)
+                else:
+                    return Response(
+                        content=content_bytes,
+                        status_code=upstream_resp.status_code,
+                        headers=resp_headers,
+                        media_type=resp_headers["Content-Type"]
+                    )
 
         except Exception as e:
             logger.error(f"Proxy attempt failed: {e}")
@@ -441,12 +560,12 @@ async def core_proxy(request: Request, litellm_path: str):
 
 @app.post("/v1/chat/completions")
 async def openai_proxy(request: Request):
-    return await core_proxy(request, "/v1/chat/completions")
+    return await core_proxy(request, is_anthropic=False)
 
 @app.post("/v1/messages")
 async def anthropic_proxy(request: Request):
-    return await core_proxy(request, "/v1/messages")
+    return await core_proxy(request, is_anthropic=True)
 
 @app.post("/openai/v1/chat/completions")
 async def openai_proxy_legacy(request: Request):
-    return await core_proxy(request, "/v1/chat/completions")
+    return await core_proxy(request, is_anthropic=False)
