@@ -574,6 +574,11 @@ async def openai_proxy(request: Request):
     """Route for OpenAI SDK / Hermes Agent"""
     return await core_proxy(request, is_anthropic=False)
 
+@app.api_route("/v1", methods=["GET", "HEAD"])
+@app.api_route("/v1/v1", methods=["GET", "HEAD"])
+async def v1_status():
+    return JSONResponse({"status": "running", "version": "1.0"})
+
 @app.get("/v1/models")
 @app.get("/v1/v1/models")
 async def list_models_proxy():
