@@ -20,6 +20,7 @@ from collections import deque
 # --- CONFIGURATION ---
 DB_PATH = "proxy_data.db"
 BASE_URL = "https://gen.pollinations.ai"
+LITELLM_URL = "http://litellm:4000"
 SESSION_TOKEN = secrets.token_hex(16)
 
 # --- SYSTEM LOGS ---
@@ -168,7 +169,6 @@ class KeyManager:
     async def get_best_key(self) -> Optional[Dict]:
         keys = await db.get_keys()
         for k in keys:
-            # Mandate: balance > 0.05
             if k['balance'] > 0.05 or k['balance'] == -1.0:
                 return k
         return None
@@ -225,7 +225,7 @@ templates = Jinja2Templates(directory="templates")
 security = HTTPBearer()
 
 # --- AUTH DEPENDENCY ---
-def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+def verify_admin_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if credentials.credentials != SESSION_TOKEN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid session")
     return True
@@ -245,7 +245,7 @@ async def admin_auth(req: AuthRequest):
 async def dashboard(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-@app.get("/admin/keys", dependencies=[Depends(verify_token)])
+@app.get("/admin/keys", dependencies=[Depends(verify_admin_token)])
 async def list_keys():
     return {"keys": await db.get_keys()}
 
@@ -253,36 +253,36 @@ class KeyAddRequest(BaseModel):
     key: str
     priority: int = 0
 
-@app.post("/admin/keys", dependencies=[Depends(verify_token)])
+@app.post("/admin/keys", dependencies=[Depends(verify_admin_token)])
 async def add_key(req: KeyAddRequest):
     await db.add_key(req.key, req.priority)
     await key_manager.check_balance(req.key)
     return {"success": True}
 
-@app.delete("/admin/keys/{key}", dependencies=[Depends(verify_token)])
+@app.delete("/admin/keys/{key}", dependencies=[Depends(verify_admin_token)])
 async def delete_key(key: str):
     await db.delete_key(key)
     return {"success": True}
 
-@app.get("/admin/test/{key}", dependencies=[Depends(verify_token)])
+@app.get("/admin/test/{key}", dependencies=[Depends(verify_admin_token)])
 async def test_key(key: str):
     balance = await key_manager.check_balance(key)
     return {"success": balance >= 0, "balance": balance}
 
 # --- CLIENT KEYS API ---
-@app.get("/admin/client-keys", dependencies=[Depends(verify_token)])
+@app.get("/admin/client-keys", dependencies=[Depends(verify_admin_token)])
 async def list_client_keys():
     return {"keys": await db.get_client_keys()}
 
 class ClientKeyAddRequest(BaseModel):
     name: str
 
-@app.post("/admin/client-keys", dependencies=[Depends(verify_token)])
+@app.post("/admin/client-keys", dependencies=[Depends(verify_admin_token)])
 async def add_client_key(req: ClientKeyAddRequest):
     new_key = await db.generate_client_key(req.name)
     return {"success": True, "key": new_key}
 
-@app.delete("/admin/client-keys/{key}", dependencies=[Depends(verify_token)])
+@app.delete("/admin/client-keys/{key}", dependencies=[Depends(verify_admin_token)])
 async def delete_client_key(key: str):
     await db.revoke_client_key(key)
     return {"success": True}
@@ -291,13 +291,13 @@ async def delete_client_key(key: str):
 class PasswordChangeRequest(BaseModel):
     new_password: str
 
-@app.post("/admin/password", dependencies=[Depends(verify_token)])
+@app.post("/admin/password", dependencies=[Depends(verify_admin_token)])
 async def change_password(req: PasswordChangeRequest):
     await db.set_admin_password(req.new_password)
     return {"success": True}
 
 # --- ANALYTICS API ---
-@app.get("/admin/analytics", dependencies=[Depends(verify_token)])
+@app.get("/admin/analytics", dependencies=[Depends(verify_admin_token)])
 async def get_analytics():
     ist = timezone(timedelta(hours=5, minutes=30))
     now = datetime.now(ist)
@@ -321,16 +321,16 @@ async def get_analytics():
     }
 
 # --- SYSTEM LOGS API ---
-@app.get("/admin/live_status", dependencies=[Depends(verify_token)])
+@app.get("/admin/live_status", dependencies=[Depends(verify_admin_token)])
 async def live_status():
     return {"logs": list(system_logs)}
 
 
-# --- THE SMART PROXY (SIDECAR LITELLM & STRICT FAILOVER) ---
+# --- THE SMART PROXY (EXPLICIT ROUTING & SIDECAR LITELLM) ---
 proxy_client = httpx.AsyncClient(timeout=900.0, follow_redirects=True)
 
-async def core_proxy(request: Request, path: str):
-    # 1. Client Authentication
+async def core_proxy(request: Request, litellm_path: str):
+    # 1. Mandatory Client Authentication (Fix 1)
     client_key = None
     auth_header = request.headers.get("Authorization")
     x_api_key = request.headers.get("x-api-key")
@@ -341,22 +341,12 @@ async def core_proxy(request: Request, path: str):
         client_key = x_api_key
         
     if not client_key:
-        return JSONResponse({"error": {"message": "Missing or invalid Authorization or x-api-key header"}}, status_code=401)
+        return JSONResponse({"error": {"message": "Missing Authorization or x-api-key header"}}, status_code=401)
     
     if not await db.validate_client_key(client_key):
-        return JSONResponse({"error": {"message": "Invalid or inactive client API key"}}, status_code=401)
+        return JSONResponse({"error": {"message": "Invalid client API key"}}, status_code=401)
 
-    is_anthropic = path.endswith("/v1/messages")
-    url = "http://litellm:4000/v1/messages" if is_anthropic else f"{BASE_URL}/{path}"
-    
-    raw_body = await request.body()
-    try:
-        body_json = json.loads(raw_body) if raw_body else {}
-    except:
-        body_json = {}
-
-    is_stream = body_json.get("stream", False)
-
+    # Prepare Headers
     clean_headers = {
         "User-Agent": "curl/8.5.0",
         "Accept": "*/*"
@@ -364,11 +354,27 @@ async def core_proxy(request: Request, path: str):
     
     for k, v in request.headers.items():
         k_lower = k.lower()
-        if k_lower.startswith("x-") or k_lower in ["accept-encoding", "content-length", "content-type", "accept", "anthropic-version"]:
+        # Keep essential headers and Anthropic specific ones
+        if k_lower.startswith("x-") or k_lower in ["accept-encoding", "content-type", "accept", "anthropic-version"]:
             clean_headers[k] = v
 
-    if is_anthropic and "Content-Type" not in clean_headers:
+    # Fix Content-Type if missing
+    if "Content-Type" not in clean_headers:
         clean_headers["Content-Type"] = "application/json"
+
+    # Prepare Body & Model Prefixing (Fix 3)
+    raw_body = await request.body()
+    try:
+        body_json = json.loads(raw_body) if raw_body else {}
+        model = body_json.get("model", "")
+        if model and not model.startswith("openai/"):
+            body_json["model"] = f"openai/{model}"
+            add_log(f"Prefixed model: {model} -> {body_json['model']}")
+            raw_body = json.dumps(body_json).encode()
+    except Exception as e:
+        logger.error(f"Body parsing failed: {e}")
+
+    url = f"{LITELLM_URL}{litellm_path}"
 
     # FAILOVER & WAIT LOOP LOGIC (Safe Streaming)
     while True:
@@ -376,9 +382,7 @@ async def core_proxy(request: Request, path: str):
         
         if not selected_key_data:
             add_log("No active keys (>0.05). Holding connection...")
-            # If we haven't returned the response yet, this just pauses the request.
-            # Client stays in 'pending' state.
-            await asyncio.sleep(150)
+            await asyncio.sleep(150) # Mandate: 150s Wait Loop
             await key_manager.force_pull_balances()
             continue
         
@@ -394,20 +398,18 @@ async def core_proxy(request: Request, path: str):
                 params=request.query_params
             )
             
-            # Start the upstream connection
             upstream_resp = await proxy_client.send(proxy_req, stream=True)
-            await db.log_usage(path, upstream_resp.status_code)
+            await db.log_usage(litellm_path, upstream_resp.status_code)
             
-            # Check for Key Failure
+            # Key Failure check
             if upstream_resp.status_code in (401, 402, 403):
                 add_log(f"Key {current_active_key[:10]} fail {upstream_resp.status_code}. Shifting...")
                 await upstream_resp.aread()
                 await upstream_resp.aclose()
                 await db.update_balance(current_active_key, 0.0)
-                continue # Try next key
+                continue
 
-            # Return StreamingResponse only after confirmed valid upstream response
-            # Forward ALL response headers (Mandate 3: Anthropic Fix)
+            # Forward headers (Mandate 3: Anthropic SDK Fix)
             resp_headers = {}
             for k, v in upstream_resp.headers.items():
                 if k.lower() not in ["content-encoding", "transfer-encoding", "content-length", "connection"]:
@@ -425,18 +427,19 @@ async def core_proxy(request: Request, path: str):
             await asyncio.sleep(2)
             continue
 
-@app.api_route("/openai/v1/chat/completions", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def openai_proxy_direct(request: Request):
-    return await core_proxy(request, "openai/v1/chat/completions")
+# --- EXPLICIT ROUTES (Fix 2) ---
 
-@app.api_route("/v1/chat/completions", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+@app.post("/v1/chat/completions")
 async def openai_proxy(request: Request):
-    return await core_proxy(request, "v1/chat/completions")
+    """Route A: OpenAI SDKs / Hermes"""
+    return await core_proxy(request, "/v1/chat/completions")
 
-@app.api_route("/v1/messages", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+@app.post("/v1/messages")
 async def anthropic_proxy(request: Request):
-    return await core_proxy(request, "v1/messages")
+    """Route B: Anthropic SDKs / Claude Code"""
+    return await core_proxy(request, "/v1/messages")
 
-@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def catch_all_proxy(request: Request, path: str):
-    return await core_proxy(request, path)
+# Legacy / Redundant paths
+@app.post("/openai/v1/chat/completions")
+async def openai_proxy_legacy(request: Request):
+    return await core_proxy(request, "/v1/chat/completions")
