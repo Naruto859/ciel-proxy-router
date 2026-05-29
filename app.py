@@ -1,9 +1,10 @@
 import os
 import json
-import sqlite3
+import aiosqlite
 import logging
 import asyncio
 import secrets
+import bcrypt
 from typing import List, Dict, Optional
 from contextlib import asynccontextmanager
 
@@ -40,12 +41,11 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     def __init__(self, path: str):
         self.path = path
-        self._init_db()
 
-    def _init_db(self):
-        with sqlite3.connect(self.path) as conn:
-            conn.execute("PRAGMA journal_mode=WAL;")
-            conn.execute("""
+    async def _init_db(self):
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("PRAGMA journal_mode=WAL;")
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS keys (
                     key TEXT PRIMARY KEY,
                     balance REAL DEFAULT -1.0,
@@ -54,7 +54,7 @@ class DatabaseManager:
                     last_checked TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            conn.execute("""
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS client_keys (
                     key TEXT PRIMARY KEY,
                     name TEXT,
@@ -62,13 +62,13 @@ class DatabaseManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            conn.execute("""
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS settings (
                     name TEXT PRIMARY KEY,
                     value TEXT
                 )
             """)
-            conn.execute("""
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS usage_stats (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -76,63 +76,87 @@ class DatabaseManager:
                     status_code INTEGER
                 )
             """)
-            conn.execute("INSERT OR IGNORE INTO settings VALUES ('polling_interval', '300')")
-            conn.execute("INSERT OR IGNORE INTO settings VALUES ('admin_password', 'Samirandas123@')")
+            await conn.execute("INSERT OR IGNORE INTO settings VALUES ('polling_interval', '300')")
+            
+            # Default password hashing
+            default_pwd = "Samirandas123@"
+            hashed_pwd = bcrypt.hashpw(default_pwd.encode(), bcrypt.gensalt()).decode()
+            await conn.execute("INSERT OR IGNORE INTO settings VALUES ('admin_password', ?)", (hashed_pwd,))
+            await conn.commit()
 
-    def log_usage(self, endpoint: str, status_code: int):
+    async def log_usage(self, endpoint: str, status_code: int):
         ist = timezone(timedelta(hours=5, minutes=30))
         ts = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
-        with sqlite3.connect(self.path) as conn:
-            conn.execute("INSERT INTO usage_stats (timestamp, endpoint, status_code) VALUES (?, ?, ?)", (ts, endpoint, status_code))
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("INSERT INTO usage_stats (timestamp, endpoint, status_code) VALUES (?, ?, ?)", (ts, endpoint, status_code))
+            await conn.commit()
 
+    async def get_keys(self):
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("SELECT * FROM keys ORDER BY priority DESC, balance DESC") as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
 
-    def get_keys(self):
-        with sqlite3.connect(self.path) as conn:
-            conn.row_factory = sqlite3.Row
-            return [dict(row) for row in conn.execute("SELECT * FROM keys ORDER BY priority DESC, balance DESC").fetchall()]
+    async def add_key(self, key: str, priority: int = 0):
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("INSERT OR REPLACE INTO keys (key, priority) VALUES (?, ?)", (key, priority))
+            await conn.commit()
 
-    def add_key(self, key: str, priority: int = 0):
-        with sqlite3.connect(self.path) as conn:
-            conn.execute("INSERT OR REPLACE INTO keys (key, priority) VALUES (?, ?)", (key, priority))
+    async def delete_key(self, key: str):
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("DELETE FROM keys WHERE key = ?", (key,))
+            await conn.commit()
 
-    def delete_key(self, key: str):
-        with sqlite3.connect(self.path) as conn:
-            conn.execute("DELETE FROM keys WHERE key = ?", (key,))
+    async def update_balance(self, key: str, balance: float):
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("UPDATE keys SET balance = ?, last_checked = CURRENT_TIMESTAMP WHERE key = ?", (balance, key))
+            await conn.commit()
 
-    def update_balance(self, key: str, balance: float):
-        with sqlite3.connect(self.path) as conn:
-            conn.execute("UPDATE keys SET balance = ?, last_checked = CURRENT_TIMESTAMP WHERE key = ?", (balance, key))
+    async def get_client_keys(self):
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("SELECT * FROM client_keys ORDER BY created_at DESC") as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
 
-    def get_client_keys(self):
-        with sqlite3.connect(self.path) as conn:
-            conn.row_factory = sqlite3.Row
-            return [dict(row) for row in conn.execute("SELECT * FROM client_keys ORDER BY created_at DESC").fetchall()]
-
-    def generate_client_key(self, name: str) -> str:
+    async def generate_client_key(self, name: str) -> str:
         new_key = f"ciel_sk_{secrets.token_hex(16)}"
-        with sqlite3.connect(self.path) as conn:
-            conn.execute("INSERT INTO client_keys (key, name) VALUES (?, ?)", (new_key, name))
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("INSERT INTO client_keys (key, name) VALUES (?, ?)", (new_key, name))
+            await conn.commit()
         return new_key
 
-    def revoke_client_key(self, key: str):
-        with sqlite3.connect(self.path) as conn:
-            conn.execute("DELETE FROM client_keys WHERE key = ?", (key,))
+    async def revoke_client_key(self, key: str):
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("DELETE FROM client_keys WHERE key = ?", (key,))
+            await conn.commit()
 
-    def validate_client_key(self, key: str) -> bool:
-        with sqlite3.connect(self.path) as conn:
-            row = conn.execute("SELECT is_active FROM client_keys WHERE key = ?", (key,)).fetchone()
-            if row and row[0] == 1:
-                return True
-            return False
+    async def validate_client_key(self, key: str) -> bool:
+        async with aiosqlite.connect(self.path) as conn:
+            async with conn.execute("SELECT is_active FROM client_keys WHERE key = ?", (key,)) as cursor:
+                row = await cursor.fetchone()
+                if row and row[0] == 1:
+                    return True
+                return False
 
-    def get_admin_password(self) -> str:
-        with sqlite3.connect(self.path) as conn:
-            row = conn.execute("SELECT value FROM settings WHERE name = 'admin_password'").fetchone()
-            return row[0] if row else "Samirandas123@"
+    async def get_admin_password_hash(self) -> str:
+        async with aiosqlite.connect(self.path) as conn:
+            async with conn.execute("SELECT value FROM settings WHERE name = 'admin_password'") as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else ""
 
-    def set_admin_password(self, password: str):
-        with sqlite3.connect(self.path) as conn:
-            conn.execute("UPDATE settings SET value = ? WHERE name = 'admin_password'", (password,))
+    async def set_admin_password(self, password: str):
+        hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("UPDATE settings SET value = ? WHERE name = 'admin_password'", (hashed,))
+            await conn.commit()
+
+    async def get_polling_interval(self) -> int:
+        async with aiosqlite.connect(self.path) as conn:
+            async with conn.execute("SELECT value FROM settings WHERE name = 'polling_interval'") as cursor:
+                row = await cursor.fetchone()
+                return int(row[0]) if row else 300
 
 db = DatabaseManager(DB_PATH)
 
@@ -141,11 +165,12 @@ class KeyManager:
     def __init__(self):
         self.client = httpx.AsyncClient(timeout=30.0)
 
-    async def get_best_key(self) -> Optional[str]:
-        keys = db.get_keys()
+    async def get_best_key(self) -> Optional[Dict]:
+        keys = await db.get_keys()
         for k in keys:
-            if k['balance'] > 0 or k['balance'] == -1.0:
-                return k['key']
+            # Mandate: balance > 0.05
+            if k['balance'] > 0.05 or k['balance'] == -1.0:
+                return k
         return None
 
     async def check_balance(self, key: str) -> float:
@@ -154,24 +179,24 @@ class KeyManager:
             response = await self.client.get(f"{BASE_URL}/account/balance", headers=headers, timeout=10.0)
             if response.status_code == 200:
                 balance = response.json().get("balance", 0.0)
-                db.update_balance(key, balance)
+                await db.update_balance(key, balance)
                 return balance
             else:
-                db.update_balance(key, 0.0)
+                await db.update_balance(key, 0.0)
                 return -2.0
         except Exception as e:
             logger.error(f"Balance check failed for {key[:10]}: {e}")
-        return -2.0 # Error state
+        return -2.0
 
     async def force_pull_balances(self):
-        """Emergency real-time check of all keys. Runs in parallel."""
-        logger.info("🚨 EMERGENCY: No healthy keys in DB cache. Triggering Force Pull...")
-        keys = db.get_keys()
-        if not keys:
-            return
-        tasks = [self.check_balance(k['key']) for k in keys]
-        await asyncio.gather(*tasks)
-        logger.info("Force Pull complete.")
+        async with balance_check_lock:
+            logger.info("🚨 EMERGENCY: Triggering Force Pull...")
+            keys = await db.get_keys()
+            if not keys:
+                return
+            tasks = [self.check_balance(k['key']) for k in keys]
+            await asyncio.gather(*tasks)
+            logger.info("Force Pull complete.")
 
 key_manager = KeyManager()
 
@@ -179,23 +204,21 @@ key_manager = KeyManager()
 async def polling_worker():
     while True:
         logger.info("Background: Refreshing all keys...")
-        keys = db.get_keys()
+        keys = await db.get_keys()
         for k in keys:
             await key_manager.check_balance(k['key'])
         
-        # Get interval from settings
-        with sqlite3.connect(DB_PATH) as conn:
-            row = conn.execute("SELECT value FROM settings WHERE name = 'polling_interval'").fetchone()
-            interval = int(row[0]) if row else 300
-        
+        interval = await db.get_polling_interval()
         await asyncio.sleep(interval)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await db._init_db()
     worker = asyncio.create_task(polling_worker())
     yield
     worker.cancel()
     await key_manager.client.aclose()
+    await proxy_client.aclose()
 
 app = FastAPI(lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
@@ -213,7 +236,8 @@ class AuthRequest(BaseModel):
 
 @app.post("/admin/auth")
 async def admin_auth(req: AuthRequest):
-    if req.pin == db.get_admin_password():
+    stored_hash = await db.get_admin_password_hash()
+    if bcrypt.checkpw(req.pin.encode(), stored_hash.encode()):
         return {"token": SESSION_TOKEN}
     raise HTTPException(status_code=401, detail="Invalid Password")
 
@@ -223,7 +247,7 @@ async def dashboard(request: Request):
 
 @app.get("/admin/keys", dependencies=[Depends(verify_token)])
 async def list_keys():
-    return {"keys": db.get_keys()}
+    return {"keys": await db.get_keys()}
 
 class KeyAddRequest(BaseModel):
     key: str
@@ -231,13 +255,13 @@ class KeyAddRequest(BaseModel):
 
 @app.post("/admin/keys", dependencies=[Depends(verify_token)])
 async def add_key(req: KeyAddRequest):
-    db.add_key(req.key, req.priority)
+    await db.add_key(req.key, req.priority)
     await key_manager.check_balance(req.key)
     return {"success": True}
 
 @app.delete("/admin/keys/{key}", dependencies=[Depends(verify_token)])
 async def delete_key(key: str):
-    db.delete_key(key)
+    await db.delete_key(key)
     return {"success": True}
 
 @app.get("/admin/test/{key}", dependencies=[Depends(verify_token)])
@@ -248,19 +272,19 @@ async def test_key(key: str):
 # --- CLIENT KEYS API ---
 @app.get("/admin/client-keys", dependencies=[Depends(verify_token)])
 async def list_client_keys():
-    return {"keys": db.get_client_keys()}
+    return {"keys": await db.get_client_keys()}
 
 class ClientKeyAddRequest(BaseModel):
     name: str
 
 @app.post("/admin/client-keys", dependencies=[Depends(verify_token)])
 async def add_client_key(req: ClientKeyAddRequest):
-    new_key = db.generate_client_key(req.name)
+    new_key = await db.generate_client_key(req.name)
     return {"success": True, "key": new_key}
 
 @app.delete("/admin/client-keys/{key}", dependencies=[Depends(verify_token)])
 async def delete_client_key(key: str):
-    db.revoke_client_key(key)
+    await db.revoke_client_key(key)
     return {"success": True}
 
 # --- SETTINGS API ---
@@ -269,7 +293,7 @@ class PasswordChangeRequest(BaseModel):
 
 @app.post("/admin/password", dependencies=[Depends(verify_token)])
 async def change_password(req: PasswordChangeRequest):
-    db.set_admin_password(req.new_password)
+    await db.set_admin_password(req.new_password)
     return {"success": True}
 
 # --- ANALYTICS API ---
@@ -278,10 +302,11 @@ async def get_analytics():
     ist = timezone(timedelta(hours=5, minutes=30))
     now = datetime.now(ist)
     
-    def get_count(start_time: str):
-        with sqlite3.connect(DB_PATH) as conn:
-            row = conn.execute("SELECT COUNT(*) FROM usage_stats WHERE timestamp >= ?", (start_time,)).fetchone()
-            return row[0] if row else 0
+    async def get_count(start_time: str):
+        async with aiosqlite.connect(DB_PATH) as conn:
+            async with conn.execute("SELECT COUNT(*) FROM usage_stats WHERE timestamp >= ?", (start_time,)) as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else 0
 
     today = (now - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
     this_week = (now - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
@@ -289,10 +314,10 @@ async def get_analytics():
     this_year = (now - timedelta(days=365)).strftime("%Y-%m-%d %H:%M:%S")
 
     return {
-        "today": get_count(today),
-        "this_week": get_count(this_week),
-        "this_month": get_count(this_month),
-        "this_year": get_count(this_year)
+        "today": await get_count(today),
+        "this_week": await get_count(this_week),
+        "this_month": await get_count(this_month),
+        "this_year": await get_count(this_year)
     }
 
 # --- SYSTEM LOGS API ---
@@ -318,11 +343,10 @@ async def core_proxy(request: Request, path: str):
     if not client_key:
         return JSONResponse({"error": {"message": "Missing or invalid Authorization or x-api-key header"}}, status_code=401)
     
-    if not db.validate_client_key(client_key):
+    if not await db.validate_client_key(client_key):
         return JSONResponse({"error": {"message": "Invalid or inactive client API key"}}, status_code=401)
 
     is_anthropic = path.endswith("/v1/messages")
-    # Route Anthropic requests to local LiteLLM sidecar proxy on port 4000
     url = "http://litellm:4000/v1/messages" if is_anthropic else f"{BASE_URL}/{path}"
     
     raw_body = await request.body()
@@ -343,100 +367,63 @@ async def core_proxy(request: Request, path: str):
         if k_lower.startswith("x-") or k_lower in ["accept-encoding", "content-length", "content-type", "accept", "anthropic-version"]:
             clean_headers[k] = v
 
-    # Ensure Content-Type is correct
     if is_anthropic and "Content-Type" not in clean_headers:
         clean_headers["Content-Type"] = "application/json"
 
-    async def generate_with_keepalive():
-        async with balance_check_lock:
-            await key_manager.force_pull_balances()
-            
-        current_active_key = None
+    # FAILOVER & WAIT LOOP LOGIC (Safe Streaming)
+    while True:
+        selected_key_data = await key_manager.get_best_key()
         
-        while True:
-            current_active_key = await key_manager.get_best_key()
+        if not selected_key_data:
+            add_log("No active keys (>0.05). Holding connection...")
+            # If we haven't returned the response yet, this just pauses the request.
+            # Client stays in 'pending' state.
+            await asyncio.sleep(15)
+            await key_manager.force_pull_balances()
+            continue
+        
+        current_active_key = selected_key_data['key']
+        clean_headers["Authorization"] = f"Bearer {current_active_key}"
+        
+        try:
+            proxy_req = proxy_client.build_request(
+                method=request.method,
+                url=url,
+                headers=clean_headers,
+                content=raw_body,
+                params=request.query_params
+            )
             
-            if not current_active_key:
-                add_log("No active keys available (Balance 0.00). Entering Safety Wall Wait Loop...")
-                wait_counter = 0
-                while not current_active_key:
-                    if is_stream:
-                        if is_anthropic:
-                            yield b'event: ping\ndata: {"type": "ping"}\n\n'
-                        else:
-                            yield b":\n\n"
-                    else:
-                        yield b" "
-                        
-                    await asyncio.sleep(15)
-                    wait_counter += 1
-                    
-                    if wait_counter % 20 == 0:
-                        add_log("WAIT mode: Refreshing balances...")
-                        async with balance_check_lock:
-                            await key_manager.force_pull_balances()
-                        current_active_key = await key_manager.get_best_key()
-                        if current_active_key:
-                            add_log("Balance detected. Resuming request...")
-                            break
+            # Start the upstream connection
+            upstream_resp = await proxy_client.send(proxy_req, stream=True)
+            await db.log_usage(path, upstream_resp.status_code)
             
-            if current_active_key:
-                # Add upstream auth key. LiteLLM proxy uses this as the upstream key.
-                clean_headers["Authorization"] = f"Bearer {current_active_key}"
-                
-                try:
-                    if is_anthropic:
-                        add_log(f"Routing Anthropic request via Sidecar LiteLLM using key {current_active_key[:10]}...")
-                        
-                    proxy_req = proxy_client.build_request(
-                        method=request.method,
-                        url=url,
-                        headers=clean_headers,
-                        content=raw_body,
-                        params=request.query_params
-                    )
-                    
-                    response = await proxy_client.send(proxy_req, stream=True)
-                    db.log_usage(path, response.status_code)
-                    
-                    if response.status_code in (401, 402, 403):
-                        add_log(f"Key {current_active_key[:10]} failed with {response.status_code}. Draining and shifting to NEXT key...")
-                        await response.aread()
-                        await response.aclose()
-                        db.update_balance(current_active_key, 0.0)
-                        current_active_key = None
-                        continue
+            # Check for Key Failure
+            if upstream_resp.status_code in (401, 402, 403):
+                add_log(f"Key {current_active_key[:10]} fail {upstream_resp.status_code}. Shifting...")
+                await upstream_resp.aread()
+                await upstream_resp.aclose()
+                await db.update_balance(current_active_key, 0.0)
+                continue # Try next key
 
-                    if response.status_code in (400, 429):
-                        add_log(f"Upstream returned {response.status_code}. Passing through to client.")
-                        async for chunk in response.aiter_bytes():
-                            yield chunk
-                        await response.aclose()
-                        return
+            # Return StreamingResponse only after confirmed valid upstream response
+            # Forward ALL response headers (Mandate 3: Anthropic Fix)
+            resp_headers = {}
+            for k, v in upstream_resp.headers.items():
+                if k.lower() not in ["content-encoding", "transfer-encoding", "content-length", "connection"]:
+                    resp_headers[k] = v
+            
+            return StreamingResponse(
+                upstream_resp.aiter_bytes(),
+                status_code=upstream_resp.status_code,
+                headers=resp_headers,
+                media_type=upstream_resp.headers.get("content-type")
+            )
 
-                    if response.status_code >= 500:
-                        add_log(f"Upstream error {response.status_code}. Retrying...")
-                        await response.aread()
-                        await response.aclose()
-                        current_active_key = None
-                        await asyncio.sleep(2)
-                        continue
-                    
-                    try:
-                        async for chunk in response.aiter_bytes():
-                            yield chunk
-                    finally:
-                        await response.aclose()
-                    return
-
-                except Exception as e:
-                    logger.error(f"Proxy attempt failed: {e}")
-                    current_active_key = None
-                    await asyncio.sleep(2)
-                    continue
-
-    media_type = "text/event-stream" if is_stream else "application/json"
-    return StreamingResponse(generate_with_keepalive(), status_code=200, media_type=media_type)
+        except Exception as e:
+            logger.error(f"Proxy attempt failed: {e}")
+            await asyncio.sleep(2)
+            continue
 
 @app.api_route("/openai/v1/chat/completions", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def openai_proxy_direct(request: Request):
