@@ -663,8 +663,14 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
     
     # 4. Translation Layer (Anthropic -> OpenAI)
     if is_anthropic:
+        with open("/tmp/debug_proxy.log", "a") as f:
+            f.write(f"\n--- RAW ANTHROPIC REQ ---\n{json.dumps(body_json, indent=2)}\n")
+            
         body_json = translate_anthropic_req_to_openai(body_json)
         raw_body = json.dumps(body_json).encode("utf-8")
+        
+        with open("/tmp/debug_proxy.log", "a") as f:
+            f.write(f"\n--- TRANSLATED OPENAI REQ ---\n{json.dumps(body_json, indent=2)}\n")
 
     # DIRECT UPSTREAM TARGET
     url = f"{BASE_URL}/v1/chat/completions"
@@ -770,7 +776,23 @@ async def v1_status():
 @app.get("/v1/models")
 @app.get("/v1/v1/models")
 async def list_models_proxy():
-    """Route for Model Discovery"""
+    """Route for Model Discovery (Anthropic Compatible)"""
     async with httpx.AsyncClient() as client:
         resp = await client.get(f"{BASE_URL}/v1/models")
+        if resp.status_code == 200:
+            try:
+                openai_models = resp.json().get("data", [])
+                anthropic_models = {
+                    "data": [
+                        {
+                            "type": "model",
+                            "id": m.get("id"),
+                            "display_name": m.get("id"),
+                            "created_at": "2024-02-29T00:00:00Z"
+                        } for m in openai_models
+                    ]
+                }
+                return JSONResponse(anthropic_models)
+            except Exception as e:
+                pass
         return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
