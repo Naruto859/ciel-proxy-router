@@ -380,6 +380,7 @@ def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
         elif isinstance(content, list):
             openai_content = []
             tool_calls = []
+            tool_results = []
             
             for block in content:
                 block_type = block.get("type")
@@ -410,11 +411,15 @@ def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
                         res_content = "".join([c.get("text", "") for c in res_content if c.get("type") == "text"])
                     if block.get("is_error"):
                         res_content = f"Error: {res_content}"
-                    openai_json["messages"].append({
+                    tool_results.append({
                         "role": "tool",
                         "tool_call_id": block.get("tool_use_id"),
                         "content": str(res_content)
                     })
+            
+            # Crucial: OpenAI requires strict order. Tool results must be appended FIRST if they are in the same block as user text.
+            for tr in tool_results:
+                openai_json["messages"].append(tr)
             
             if tool_calls:
                 # If there are tool calls, it's an assistant message
