@@ -408,10 +408,12 @@ def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
                     res_content = block.get("content", "")
                     if isinstance(res_content, list):
                         res_content = "".join([c.get("text", "") for c in res_content if c.get("type") == "text"])
+                    if block.get("is_error"):
+                        res_content = f"Error: {res_content}"
                     openai_json["messages"].append({
                         "role": "tool",
                         "tool_call_id": block.get("tool_use_id"),
-                        "content": res_content
+                        "content": str(res_content)
                     })
             
             if tool_calls:
@@ -419,11 +421,20 @@ def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
                 openai_msg = {"role": "assistant"}
                 if openai_content:
                     openai_msg["content"] = "".join([c.get("text", "") for c in openai_content if c.get("type") == "text"])
+                else:
+                    openai_msg["content"] = "" # OpenAI requires content even if empty when sending tool calls
                 openai_msg["tool_calls"] = tool_calls
                 openai_json["messages"].append(openai_msg)
             elif openai_content:
                 # Normal user/assistant message with text/image
-                openai_json["messages"].append({"role": role, "content": openai_content})
+                has_image = any(c.get("type") == "image_url" for c in openai_content)
+                if not has_image:
+                    # Flatten to string to prevent 400 errors on text models
+                    content_str = "".join([c.get("text", "") for c in openai_content if c.get("type") == "text"])
+                    if content_str:
+                        openai_json["messages"].append({"role": role, "content": content_str})
+                else:
+                    openai_json["messages"].append({"role": role, "content": openai_content})
                 
     return openai_json
 
