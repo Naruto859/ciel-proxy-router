@@ -332,50 +332,151 @@ proxy_client = httpx.AsyncClient(timeout=900.0, follow_redirects=True)
 # ANTHROPIC TO OPENAI TRANSLATORS (Standalone)
 # ---------------------------------------------------------
 def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
-    """Translates Anthropic JSON payload to OpenAI JSON payload"""
+    """Translates Anthropic JSON payload to OpenAI JSON payload, including Tools & Vision"""
     model = anthropic_json.get("model", "openai")
-    # Native Pollinations expects simple model names
     openai_json = {
         "model": model,
         "max_tokens": anthropic_json.get("max_tokens", 1024),
         "stream": anthropic_json.get("stream", False),
         "messages": []
     }
+    
+    # 1. System Prompt
     if "system" in anthropic_json and anthropic_json["system"]:
         sys_content = anthropic_json["system"]
         if isinstance(sys_content, list):
             sys_content = "".join([block.get("text", "") for block in sys_content if block.get("type") == "text"])
         openai_json["messages"].append({"role": "system", "content": sys_content})
         
+    # 2. Tools Translation
+    if "tools" in anthropic_json:
+        openai_json["tools"] = []
+        for tool in anthropic_json["tools"]:
+            openai_json["tools"].append({
+                "type": "function",
+                "function": {
+                    "name": tool.get("name"),
+                    "description": tool.get("description", ""),
+                    "parameters": tool.get("input_schema", {})
+                }
+            })
+            
+    if "tool_choice" in anthropic_json:
+        choice = anthropic_json["tool_choice"]
+        if choice.get("type") == "auto":
+            openai_json["tool_choice"] = "auto"
+        elif choice.get("type") == "any":
+            openai_json["tool_choice"] = "required"
+        elif choice.get("type") == "tool":
+            openai_json["tool_choice"] = {"type": "function", "function": {"name": choice.get("name")}}
+
+    # 3. Messages Translation (Text, Images, Tool Use, Tool Results)
     for msg in anthropic_json.get("messages", []):
         role = msg.get("role", "user")
         content = msg.get("content", "")
-        if isinstance(content, list):
-            content = "".join([block.get("text", "") for block in content if block.get("type") == "text"])
-        openai_json["messages"].append({"role": role, "content": content})
         
+        if isinstance(content, str):
+            openai_json["messages"].append({"role": role, "content": content})
+        elif isinstance(content, list):
+            openai_content = []
+            tool_calls = []
+            
+            for block in content:
+                block_type = block.get("type")
+                if block_type == "text":
+                    openai_content.append({"type": "text", "text": block.get("text", "")})
+                elif block_type == "image":
+                    source = block.get("source", {})
+                    if source.get("type") == "base64":
+                        data = source.get("data")
+                        media_type = source.get("media_type", "image/jpeg")
+                        openai_content.append({
+                            "type": "image_url",
+                            "image_url": {"url": f"data:{media_type};base64,{data}"}
+                        })
+                elif block_type == "tool_use":
+                    tool_calls.append({
+                        "id": block.get("id"),
+                        "type": "function",
+                        "function": {
+                            "name": block.get("name"),
+                            "arguments": json.dumps(block.get("input", {}))
+                        }
+                    })
+                elif block_type == "tool_result":
+                    # Anthropic tool_result -> OpenAI tool message
+                    res_content = block.get("content", "")
+                    if isinstance(res_content, list):
+                        res_content = "".join([c.get("text", "") for c in res_content if c.get("type") == "text"])
+                    openai_json["messages"].append({
+                        "role": "tool",
+                        "tool_call_id": block.get("tool_use_id"),
+                        "content": res_content
+                    })
+            
+            if tool_calls:
+                # If there are tool calls, it's an assistant message
+                openai_msg = {"role": "assistant"}
+                if openai_content:
+                    openai_msg["content"] = "".join([c.get("text", "") for c in openai_content if c.get("type") == "text"])
+                openai_msg["tool_calls"] = tool_calls
+                openai_json["messages"].append(openai_msg)
+            elif openai_content:
+                # Normal user/assistant message with text/image
+                openai_json["messages"].append({"role": role, "content": openai_content})
+                
     return openai_json
 
 def translate_openai_resp_to_anthropic(openai_json: dict) -> dict:
     """Translates OpenAI ChatCompletion response to Anthropic Message response"""
-    content = ""
+    content_blocks = []
+    stop_reason = "end_turn"
+    
     if "choices" in openai_json and len(openai_json["choices"]) > 0:
-        msg = openai_json["choices"][0].get("message", {})
-        content = msg.get("content", "")
+        choice = openai_json["choices"][0]
+        msg = choice.get("message", {})
+        
+        # 1. Handle Text Content
+        if msg.get("content"):
+            content_blocks.append({"type": "text", "text": msg.get("content")})
+            
+        # 2. Handle Tool Calls
+        if msg.get("tool_calls"):
+            stop_reason = "tool_use"
+            for tcall in msg.get("tool_calls", []):
+                try:
+                    args = json.loads(tcall.get("function", {}).get("arguments", "{}"))
+                except:
+                    args = {}
+                content_blocks.append({
+                    "type": "tool_use",
+                    "id": tcall.get("id"),
+                    "name": tcall.get("function", {}).get("name"),
+                    "input": args
+                })
+                
+        # 3. Handle Finish Reason mapping
+        oai_finish = choice.get("finish_reason")
+        if oai_finish == "tool_calls":
+            stop_reason = "tool_use"
+        elif oai_finish == "length":
+            stop_reason = "max_tokens"
+        elif oai_finish == "stop":
+            stop_reason = "end_turn"
         
     return {
         "id": openai_json.get("id", "msg_" + secrets.token_hex(8)),
         "type": "message",
         "role": "assistant",
         "model": openai_json.get("model", "openai"),
-        "content": [{"type": "text", "text": content}],
-        "stop_reason": "end_turn",
+        "content": content_blocks,
+        "stop_reason": stop_reason,
         "stop_sequence": None,
         "usage": {"input_tokens": 0, "output_tokens": 0}
     }
 
 async def stream_openai_to_anthropic(upstream_resp, original_model):
-    """Translates OpenAI SSE to Anthropic SSE for Claude SDK stability"""
+    """Translates OpenAI SSE to Anthropic SSE for Claude SDK stability, including Tool Calls"""
     try:
         # yield message_start
         msg_id = "msg_" + secrets.token_hex(8)
@@ -394,8 +495,12 @@ async def stream_openai_to_anthropic(upstream_resp, original_model):
         }
         yield f'event: message_start\ndata: {json.dumps(start_msg)}\n\n'.encode("utf-8")
         
-        block_start = {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}}
-        yield f'event: content_block_start\ndata: {json.dumps(block_start)}\n\n'.encode("utf-8")
+        current_block_index = 0
+        in_text_block = False
+        in_tool_block = False
+        current_tool_call_id = ""
+        current_tool_name = ""
+        current_tool_args = ""
         
         async for line in upstream_resp.aiter_lines():
             line = line.strip()
@@ -409,25 +514,85 @@ async def stream_openai_to_anthropic(upstream_resp, original_model):
                 choices = data_json.get("choices", [])
                 if choices:
                     delta = choices[0].get("delta", {})
-                    if "content" in delta and delta["content"]:
+                    
+                    # A. Text Content Streaming
+                    if "content" in delta and delta["content"] is not None:
+                        if not in_text_block:
+                            block_start = {"type": "content_block_start", "index": current_block_index, "content_block": {"type": "text", "text": ""}}
+                            yield f'event: content_block_start\ndata: {json.dumps(block_start)}\n\n'.encode("utf-8")
+                            in_text_block = True
+                            
                         anthropic_delta = {
                             "type": "content_block_delta",
-                            "index": 0,
-                            "delta": {
-                                "type": "text_delta",
-                                "text": delta["content"]
-                            }
+                            "index": current_block_index,
+                            "delta": {"type": "text_delta", "text": delta["content"]}
                         }
                         yield f'event: content_block_delta\ndata: {json.dumps(anthropic_delta)}\n\n'.encode("utf-8")
+                        
+                    # B. Tool Calls Streaming
+                    if "tool_calls" in delta:
+                        # If we were streaming text, close that block first
+                        if in_text_block:
+                            block_stop = {"type": "content_block_stop", "index": current_block_index}
+                            yield f'event: content_block_stop\ndata: {json.dumps(block_stop)}\n\n'.encode("utf-8")
+                            in_text_block = False
+                            current_block_index += 1
+                            
+                        tcall = delta["tool_calls"][0] # Usually streams one at a time
+                        
+                        # New Tool Call Block Start
+                        if "id" in tcall and tcall["id"]:
+                            # If we were already in a tool block, close the previous one
+                            if in_tool_block:
+                                block_stop = {"type": "content_block_stop", "index": current_block_index}
+                                yield f'event: content_block_stop\ndata: {json.dumps(block_stop)}\n\n'.encode("utf-8")
+                                current_block_index += 1
+                                
+                            current_tool_call_id = tcall["id"]
+                            current_tool_name = tcall.get("function", {}).get("name", "")
+                            block_start = {
+                                "type": "content_block_start", 
+                                "index": current_block_index, 
+                                "content_block": {
+                                    "type": "tool_use", 
+                                    "id": current_tool_call_id,
+                                    "name": current_tool_name,
+                                    "input": {} # We stream args later
+                                }
+                            }
+                            yield f'event: content_block_start\ndata: {json.dumps(block_start)}\n\n'.encode("utf-8")
+                            in_tool_block = True
+                            
+                        # Tool Arguments Delta
+                        if "function" in tcall and "arguments" in tcall["function"]:
+                            anthropic_delta = {
+                                "type": "content_block_delta",
+                                "index": current_block_index,
+                                "delta": {"type": "input_json_delta", "partial_json": tcall["function"]["arguments"]}
+                            }
+                            yield f'event: content_block_delta\ndata: {json.dumps(anthropic_delta)}\n\n'.encode("utf-8")
+                            
+                    # C. Stop Reason Mapping
+                    finish_reason = choices[0].get("finish_reason")
+                    if finish_reason:
+                        # Close any open blocks
+                        if in_text_block or in_tool_block:
+                            block_stop = {"type": "content_block_stop", "index": current_block_index}
+                            yield f'event: content_block_stop\ndata: {json.dumps(block_stop)}\n\n'.encode("utf-8")
+                            
+                        stop_mapping = {
+                            "stop": "end_turn",
+                            "tool_calls": "tool_use",
+                            "length": "max_tokens"
+                        }
+                        anthropic_stop = stop_mapping.get(finish_reason, "end_turn")
+                        
+                        msg_delta = {"type": "message_delta", "delta": {"stop_reason": anthropic_stop, "stop_sequence": None}, "usage": {"output_tokens": 10}}
+                        yield f'event: message_delta\ndata: {json.dumps(msg_delta)}\n\n'.encode("utf-8")
+
             except json.JSONDecodeError:
                 continue
                 
-        block_stop = {"type": "content_block_stop", "index": 0}
-        yield f'event: content_block_stop\ndata: {json.dumps(block_stop)}\n\n'.encode("utf-8")
-        
-        msg_delta = {"type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": None}, "usage": {"output_tokens": 10}}
-        yield f'event: message_delta\ndata: {json.dumps(msg_delta)}\n\n'.encode("utf-8")
-        
         yield b'event: message_stop\ndata: {"type": "message_stop"}\n\n'
     finally:
         await upstream_resp.aclose()
