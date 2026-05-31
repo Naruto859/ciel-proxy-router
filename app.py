@@ -25,6 +25,7 @@ SESSION_TOKEN = secrets.token_hex(16)
 # --- SYSTEM LOGS ---
 system_logs = deque(maxlen=50)
 balance_check_lock = asyncio.Lock()
+last_wait_log_time = 0.0
 
 def add_log(msg: str):
     ist = timezone(timedelta(hours=5, minutes=30))
@@ -164,6 +165,7 @@ db = DatabaseManager(DB_PATH)
 class KeyManager:
     def __init__(self):
         self.client = httpx.AsyncClient(timeout=30.0)
+        self.last_force_pull_time = 0.0
 
     async def get_best_key(self) -> Optional[Dict]:
         keys = await db.get_keys()
@@ -189,6 +191,12 @@ class KeyManager:
 
     async def force_pull_balances(self):
         async with balance_check_lock:
+            current_time = asyncio.get_event_loop().time()
+            if current_time - self.last_force_pull_time < 150.0:
+                # Throttle emergency pulls to once per 150 seconds globally
+                return
+            self.last_force_pull_time = current_time
+            
             logger.info("🚨 EMERGENCY: Triggering Force Pull...")
             keys = await db.get_keys()
             if not keys:
@@ -683,11 +691,15 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
     url = f"{BASE_URL}/v1/chat/completions"
 
     # 5. FAILOVER & WAIT LOOP LOGIC
+    global last_wait_log_time
     while True:
         selected_key_data = await key_manager.get_best_key()
         
         if not selected_key_data:
-            add_log("No active keys (>0.05). Holding connection...")
+            current_time = asyncio.get_event_loop().time()
+            if current_time - last_wait_log_time > 150.0:
+                add_log("No active keys (>0.05). Holding connection...")
+                last_wait_log_time = current_time
             await asyncio.sleep(150) # 150s Wait Loop
             await key_manager.force_pull_balances()
             continue
@@ -710,7 +722,7 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
             
             # Ban protection / Shifting
             if upstream_resp.status_code in (401, 402, 403):
-                add_log(f"Key {current_active_key[:10]} fail {upstream_resp.status_code}. Shifting...")
+                add_log(f"Key {current_active_key[:10]} depleted (HTTP {upstream_resp.status_code}). Zeroing balance and shifting...")
                 await upstream_resp.aread()
                 await upstream_resp.aclose()
                 await db.update_balance(current_active_key, 0.0)
