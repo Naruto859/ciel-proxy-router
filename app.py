@@ -532,7 +532,14 @@ async def stream_openai_to_anthropic(upstream_resp, original_model):
                     delta = choices[0].get("delta", {})
                     
                     # A. Text Content Streaming
-                    if "content" in delta and delta["content"] is not None:
+                    if "content" in delta and delta["content"]: # Only process if content is not empty
+                        if in_tool_block:
+                            # Close tool block before starting text
+                            block_stop = {"type": "content_block_stop", "index": current_block_index}
+                            yield f'event: content_block_stop\ndata: {json.dumps(block_stop)}\n\n'.encode("utf-8")
+                            in_tool_block = False
+                            current_block_index += 1
+                            
                         if not in_text_block:
                             block_start = {"type": "content_block_start", "index": current_block_index, "content_block": {"type": "text", "text": ""}}
                             yield f'event: content_block_start\ndata: {json.dumps(block_start)}\n\n'.encode("utf-8")
