@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import aiosqlite
 import logging
@@ -349,12 +350,18 @@ def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
         "messages": []
     }
     
-    # 1. System Prompt
+    # 1. System Prompt (CLEANED — strip x-anthropic-billing-header and SDK junk)
     if "system" in anthropic_json and anthropic_json["system"]:
         sys_content = anthropic_json["system"]
         if isinstance(sys_content, list):
             sys_content = "".join([block.get("text", "") for block in sys_content if block.get("type") == "text"])
-        openai_json["messages"].append({"role": "system", "content": sys_content})
+        # Strip x-anthropic-billing-header and all Claude SDK internals — these leak into system prompt as plain text
+        # Pattern: "x-anthropic-billing-header: key=val; key=val; actual system prompt"
+        # The SDK sends semi-colon-separated key=value pairs followed immediately by the real system text
+        sys_content = re.sub(r'^x-anthropic-billing-header:\s*(?:[a-z_]+=[^\s;]+;\s*)*', '', sys_content)
+        sys_content = sys_content.strip()
+        if sys_content:
+            openai_json["messages"].append({"role": "system", "content": sys_content})
         
     # 2. Tools Translation
     if "tools" in anthropic_json:
@@ -379,29 +386,43 @@ def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
             openai_json["tool_choice"] = {"type": "function", "function": {"name": choice.get("name")}}
 
     # 3. Messages Translation (Text, Images, Tool Use, Tool Results)
+    raw_messages = []
+
     for msg in anthropic_json.get("messages", []):
         role = msg.get("role", "user")
         content = msg.get("content", "")
-        
+
+        # Skip system messages in the conversation history — only top-level "system" field
+        # should produce a system message. Upstream rejects system messages anywhere else.
+        if role == "system":
+            continue
+
         if isinstance(content, str):
-            openai_json["messages"].append({"role": role, "content": content})
+            raw_messages.append({"role": role, "content": content})
         elif isinstance(content, list):
             openai_content = []
             tool_calls = []
             tool_results = []
-            
+
             for block in content:
                 block_type = block.get("type")
                 if block_type == "text":
                     openai_content.append({"type": "text", "text": block.get("text", "")})
                 elif block_type == "image":
                     source = block.get("source", {})
-                    if source.get("type") == "base64":
+                    source_type = source.get("type")
+                    if source_type == "base64":
                         data = source.get("data")
                         media_type = source.get("media_type", "image/jpeg")
                         openai_content.append({
                             "type": "image_url",
                             "image_url": {"url": f"data:{media_type};base64,{data}"}
+                        })
+                    elif source_type == "url":
+                        # Claude Code sometimes sends images as URLs
+                        openai_content.append({
+                            "type": "image_url",
+                            "image_url": {"url": source.get("url", "")}
                         })
                 elif block_type == "tool_use":
                     tool_calls.append({
@@ -424,20 +445,31 @@ def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
                         "tool_call_id": block.get("tool_use_id"),
                         "content": str(res_content)
                     })
-            
+
             # Crucial: OpenAI requires strict order. Tool results must be appended FIRST if they are in the same block as user text.
             for tr in tool_results:
-                openai_json["messages"].append(tr)
-            
+                raw_messages.append(tr)
+
             if tool_calls:
                 # If there are tool calls, it's an assistant message
+                # FIX: Preserve image content alongside tool_calls (images were being dropped here)
                 openai_msg = {"role": "assistant"}
                 if openai_content:
-                    openai_msg["content"] = "".join([c.get("text", "") for c in openai_content if c.get("type") == "text"])
+                    has_image = any(c.get("type") == "image_url" for c in openai_content)
+                    if has_image:
+                        # Keep the full content array with images — OpenAI supports image_url + text
+                        # But OpenAI also needs tool_calls. We include both text and images.
+                        text_content = "".join([c.get("text", "") for c in openai_content if c.get("type") == "text"])
+                        image_items = [c for c in openai_content if c.get("type") == "image_url"]
+                        # Build content as array: text + images
+                        content_parts = [{"type": "text", "text": text_content}] + image_items
+                        openai_msg["content"] = content_parts
+                    else:
+                        openai_msg["content"] = "".join([c.get("text", "") for c in openai_content if c.get("type") == "text"])
                 else:
                     openai_msg["content"] = "" # OpenAI requires content even if empty when sending tool calls
                 openai_msg["tool_calls"] = tool_calls
-                openai_json["messages"].append(openai_msg)
+                raw_messages.append(openai_msg)
             elif openai_content:
                 # Normal user/assistant message with text/image
                 has_image = any(c.get("type") == "image_url" for c in openai_content)
@@ -445,10 +477,12 @@ def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
                     # Flatten to string to prevent 400 errors on text models
                     content_str = "".join([c.get("text", "") for c in openai_content if c.get("type") == "text"])
                     if content_str:
-                        openai_json["messages"].append({"role": role, "content": content_str})
+                        raw_messages.append({"role": role, "content": content_str})
                 else:
-                    openai_json["messages"].append({"role": role, "content": openai_content})
-                
+                    raw_messages.append({"role": role, "content": openai_content})
+
+    openai_json["messages"] = raw_messages
+
     return openai_json
 
 def translate_openai_resp_to_anthropic(openai_json: dict) -> dict:
@@ -752,8 +786,17 @@ async def core_proxy(request: Request, is_anthropic: bool = False):
                 # Synchronous Response or Error Response
                 content_bytes = await upstream_resp.aread()
                 await upstream_resp.aclose()
-                
+
                 if is_anthropic:
+                    # For 400/5xx errors, pass through the raw upstream error without translation
+                    if upstream_resp.status_code >= 400:
+                        logger.error(f"Upstream returned HTTP {upstream_resp.status_code}: {content_bytes[:500]}")
+                        return Response(
+                            content=content_bytes,
+                            status_code=upstream_resp.status_code,
+                            headers=resp_headers,
+                            media_type=resp_headers["Content-Type"]
+                        )
                     try:
                         openai_resp_json = json.loads(content_bytes)
                         anthropic_resp_json = translate_openai_resp_to_anthropic(openai_resp_json)
