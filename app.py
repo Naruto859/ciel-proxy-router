@@ -83,6 +83,8 @@ class DatabaseManager:
                 )
             """)
             await conn.execute("INSERT OR IGNORE INTO settings VALUES ('polling_interval', '300')")
+            await conn.execute("INSERT OR IGNORE INTO settings VALUES ('force_check_interval', '300')")
+            await conn.execute("INSERT OR IGNORE INTO settings VALUES ('max_hold_duration', '7200')")
             
             # Default password
             default_pwd = "Samirandas123@"
@@ -188,6 +190,28 @@ class DatabaseManager:
             await conn.execute("UPDATE settings SET value = ? WHERE name = 'polling_interval'", (str(seconds),))
             await conn.commit()
 
+    async def get_force_check_interval(self) -> int:
+        async with aiosqlite.connect(self.path) as conn:
+            async with conn.execute("SELECT value FROM settings WHERE name = 'force_check_interval'") as cursor:
+                row = await cursor.fetchone()
+                return int(row[0]) if row else 300
+
+    async def set_force_check_interval(self, seconds: int):
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("UPDATE settings SET value = ? WHERE name = 'force_check_interval'", (str(seconds),))
+            await conn.commit()
+
+    async def get_max_hold_duration(self) -> int:
+        async with aiosqlite.connect(self.path) as conn:
+            async with conn.execute("SELECT value FROM settings WHERE name = 'max_hold_duration'") as cursor:
+                row = await cursor.fetchone()
+                return int(row[0]) if row else 7200
+
+    async def set_max_hold_duration(self, seconds: int):
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("UPDATE settings SET value = ? WHERE name = 'max_hold_duration'", (str(seconds),))
+            await conn.commit()
+
     async def log_usage(self, endpoint: str, status_code: int):
         ist = timezone(timedelta(hours=5, minutes=30))
         ts = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
@@ -266,7 +290,8 @@ class KeyManager:
     async def force_pull_balances(self):
         async with balance_check_lock:
             current_time = asyncio.get_event_loop().time()
-            if current_time - self.last_force_pull_time < 150.0:
+            interval = await db.get_force_check_interval()
+            if current_time - self.last_force_pull_time < float(interval):
                 return
             self.last_force_pull_time = current_time
             keys = await db.get_keys()
@@ -399,9 +424,28 @@ async def get_polling():
     return {"interval": await db.get_polling_interval()}
 
 @app.post("/admin/settings/polling", dependencies=[Depends(verify_admin_token)])
-async def update_polling(req: Dict):
-    await db.set_polling_interval(req['interval'])
+async def set_polling(req: Dict):
+    await db.set_polling_interval(int(req['interval']))
     return {"success": True}
+
+@app.get("/admin/settings/force_check", dependencies=[Depends(verify_admin_token)])
+async def get_force_check():
+    return {"interval": await db.get_force_check_interval()}
+
+@app.post("/admin/settings/force_check", dependencies=[Depends(verify_admin_token)])
+async def set_force_check(req: Dict):
+    await db.set_force_check_interval(int(req['interval']))
+    return {"success": True}
+
+@app.get("/admin/settings/max_hold", dependencies=[Depends(verify_admin_token)])
+async def get_max_hold():
+    return {"duration": await db.get_max_hold_duration()}
+
+@app.post("/admin/settings/max_hold", dependencies=[Depends(verify_admin_token)])
+async def set_max_hold(req: Dict):
+    await db.set_max_hold_duration(int(req['duration']))
+    return {"success": True}
+
 
 @app.get("/admin/live_status", dependencies=[Depends(verify_admin_token)])
 async def live_status():
@@ -608,11 +652,14 @@ async def core_proxy(request: Request):
     
     orig_model = body_json.get("model", "openai")
     is_stream = body_json.get("stream", False)
-    if is_anthropic: body_json = translate_anthropic_req_to_openai(body_json)
+    if is_anthropic: 
+        body_json = translate_anthropic_req_to_openai(body_json)
+        raw_body = json.dumps(body_json).encode("utf-8")
     
-    attempts = 0
-    while attempts < 10:
-        attempts += 1
+    max_hold = await db.get_max_hold_duration()
+    start_time = asyncio.get_event_loop().time()
+    
+    while asyncio.get_event_loop().time() - start_time < max_hold:
         key_data = await key_manager.get_best_key()
         if not key_data:
             await asyncio.sleep(2); await key_manager.force_pull_balances(); continue
@@ -627,11 +674,11 @@ async def core_proxy(request: Request):
             headers = {"Authorization": f"Bearer {key_data['key']}", "Content-Type": "application/json", "User-Agent": "curl/8.5.0"}
             
             if not is_stream:
-                resp = await proxy_client.post(f"{BASE_URL}/v1/chat/completions", headers=headers, json=body_json, timeout=90.0)
+                resp = await proxy_client.post(f"{BASE_URL}/v1/chat/completions", headers=headers, content=raw_body, timeout=90.0)
                 await db.log_usage(request.url.path, resp.status_code)
                 add_log(f"Req: {key_data['key'][:8]} via {proxy_info} -> {resp.status_code}")
                 
-                if resp.status_code in (401, 403):
+                if resp.status_code in (401, 402, 403):
                     await db.update_balance(key_data['key'], 0.0); continue
                 
                 if is_anthropic and resp.status_code == 200:
@@ -639,10 +686,10 @@ async def core_proxy(request: Request):
                 return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
             else:
                 # Optimized Streaming: Check status before yielding
-                resp_ctx = proxy_client.stream("POST", f"{BASE_URL}/v1/chat/completions", headers=headers, json=body_json, timeout=90.0)
+                resp_ctx = proxy_client.stream("POST", f"{BASE_URL}/v1/chat/completions", headers=headers, content=raw_body, timeout=90.0)
                 resp_stream = await resp_ctx.__aenter__()
                 
-                if resp_stream.status_code in (401, 403):
+                if resp_stream.status_code in (401, 402, 403):
                     await resp_ctx.__aexit__(None, None, None)
                     await db.update_balance(key_data['key'], 0.0); continue
                 
@@ -656,8 +703,8 @@ async def core_proxy(request: Request):
                         if is_anthropic:
                             async for chunk in stream_openai_to_anthropic(resp_stream, orig_model): yield chunk
                         else:
-                            async for line in resp_stream.aiter_lines():
-                                if line: yield (line + "\n").encode("utf-8")
+                            async for chunk in resp_stream.aiter_bytes():
+                                yield chunk
                     except Exception as e:
                         add_log(f"Stream Error: {e}")
                         yield f'data: {{"error": "{str(e)}"}}\n\n'.encode("utf-8")
@@ -670,11 +717,10 @@ async def core_proxy(request: Request):
             if e.status_code in (401, 403): continue
             return JSONResponse({"error": str(e)}, status_code=e.status_code)
         except Exception as e:
-            add_log(f"Error: {e}")
-            if attempts >= 10: return JSONResponse({"error": str(e)}, status_code=500)
-            await asyncio.sleep(1); continue
+            add_log(f"Proxy attempt failed: {e}")
+            await asyncio.sleep(2); continue
 
-    return JSONResponse({"error": "All keys exhausted or max retries reached"}, status_code=503)
+    return JSONResponse({"error": "All keys exhausted or max hold duration reached"}, status_code=503)
 
 @app.api_route("/v1", methods=["GET", "HEAD"])
 async def v1_status(): return JSONResponse({"status": "running"})

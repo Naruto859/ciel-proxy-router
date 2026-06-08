@@ -414,9 +414,21 @@
     <div id="modal-polling" class="overlay hide">
         <div class="glass-panel p-8 w-full max-w-sm mx-4 text-center">
             <h2 class="text-xl font-bold mb-4 text-white uppercase">Kernel Settings</h2>
-            <p class="text-[10px] opacity-50 mb-4 font-bold">Polling Interval (Seconds)</p>
-            <input id="poll-sec" type="number" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-center text-2xl font-black text-accent mb-6 outline-none">
-            <div class="flex gap-3"><button onclick="hideModal('modal-polling')" class="flex-1 p-3 rounded-xl bg-white/5">Cancel</button><button onclick="savePolling()" class="flex-1 p-3 rounded-xl btn-primary">Update</button></div>
+            <div class="space-y-4">
+                <div>
+                    <p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Polling Interval (Seconds)</p>
+                    <input id="poll-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none">
+                </div>
+                <div>
+                    <p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Force Check Interval (Seconds)</p>
+                    <input id="force-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none">
+                </div>
+                <div>
+                    <p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Max Hold Duration (Seconds)</p>
+                    <input id="hold-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none">
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6"><button onclick="hideModal('modal-polling')" class="flex-1 p-3 rounded-xl bg-white/5 font-bold">Cancel</button><button onclick="savePolling()" class="flex-1 p-3 rounded-xl btn-primary">Update</button></div>
         </div>
     </div>
 
@@ -586,8 +598,32 @@
 
         async function testProxy(id) { const el=document.getElementById('ps-'+id); el.classList.remove('hidden'); el.innerText='PROBING...'; const res=await fetch('/admin/proxies/test/'+id, {headers:{'Authorization':`Bearer ${sessionToken}`}}); const d=await res.json(); if(d.success){ el.innerHTML=`<span style="color:#022c22">PASS: ${d.detected_ip}</span>`; showToast('Proxy Verified'); } else { el.innerHTML=`<span style="color:#ff5757">FAILED</span>`; showToast('Proxy Error',true); } }
         async function testKey(k) { showToast('Verifying...'); try { const res=await fetch('/admin/test/'+k,{headers:{'Authorization':`Bearer ${sessionToken}`}}); const d=await res.json(); document.getElementById('v-ip').innerText=d.ip||'VPS IP (Direct)'; document.getElementById('v-bal').innerText=(d.balance>0?d.balance:0).toFixed(4)+' P'; document.getElementById('v-status').innerHTML=d.success?'<span style="color:#00ffd6">VERIFIED</span>':'<span style="color:#ff5757">FAILED</span>'; showModal('modal-verify'); refreshData(); } catch(e){showToast('Error',true);} }
-        async function showPollingModal() { const res=await fetch('/admin/settings/polling', {headers:{'Authorization':`Bearer ${sessionToken}`}}); if(res.ok){ document.getElementById('poll-sec').value=(await res.json()).interval; showModal('modal-polling'); } }
-        async function savePolling() { const s=parseInt(document.getElementById('poll-sec').value); if(s>=10){ await fetch('/admin/settings/polling',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({interval:s})}); hideModal('modal-polling'); showToast('Polling Updated'); } }
+        async function showPollingModal() {
+            const [resP, resF, resH] = await Promise.all([
+                fetch('/admin/settings/polling', {headers:{'Authorization':`Bearer ${sessionToken}`}}),
+                fetch('/admin/settings/force_check', {headers:{'Authorization':`Bearer ${sessionToken}`}}),
+                fetch('/admin/settings/max_hold', {headers:{'Authorization':`Bearer ${sessionToken}`}})
+            ]);
+            if(resP.ok && resF.ok && resH.ok) {
+                document.getElementById('poll-sec').value = (await resP.json()).interval;
+                document.getElementById('force-sec').value = (await resF.json()).interval;
+                document.getElementById('hold-sec').value = (await resH.json()).duration;
+                showModal('modal-polling');
+            }
+        }
+        async function savePolling() {
+            const poll = parseInt(document.getElementById('poll-sec').value);
+            const force = parseInt(document.getElementById('force-sec').value);
+            const hold = parseInt(document.getElementById('hold-sec').value);
+            
+            await Promise.all([
+                fetch('/admin/settings/polling',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({interval:poll})}),
+                fetch('/admin/settings/force_check',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({interval:force})}),
+                fetch('/admin/settings/max_hold',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({duration:hold})})
+            ]);
+            hideModal('modal-polling');
+            showToast('Kernel Settings Updated');
+        }
         async function saveProxy() {
             const ip=document.getElementById('p-ip').value, port=document.getElementById('p-port').value, user=document.getElementById('p-user').value, pass=document.getElementById('p-pass').value;
             if(!ip || !port) return showToast('IP and Port required', true);
