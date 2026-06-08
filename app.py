@@ -639,16 +639,16 @@ async def core_proxy(request: Request):
                 return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
             else:
                 # Optimized Streaming: Check status before yielding
-                resp_stream = proxy_client.stream("POST", f"{BASE_URL}/v1/chat/completions", headers=headers, json=body_json, timeout=90.0)
-                await resp_stream.__aenter__()
+                resp_ctx = proxy_client.stream("POST", f"{BASE_URL}/v1/chat/completions", headers=headers, json=body_json, timeout=90.0)
+                resp_stream = await resp_ctx.__aenter__()
                 
                 if resp_stream.status_code in (401, 403):
-                    await resp_stream.__aexit__(None, None, None)
+                    await resp_ctx.__aexit__(None, None, None)
                     await db.update_balance(key_data['key'], 0.0); continue
                 
                 if resp_stream.status_code != 200:
                     content = await resp_stream.aread()
-                    await resp_stream.__aexit__(None, None, None)
+                    await resp_ctx.__aexit__(None, None, None)
                     return Response(content=content, status_code=resp_stream.status_code)
 
                 async def stream_generator():
@@ -662,7 +662,7 @@ async def core_proxy(request: Request):
                         add_log(f"Stream Error: {e}")
                         yield f'data: {{"error": "{str(e)}"}}\n\n'.encode("utf-8")
                     finally:
-                        await resp_stream.__aexit__(None, None, None)
+                        await resp_ctx.__aexit__(None, None, None)
 
                 return StreamingResponse(stream_generator(), media_type="text/event-stream")
                 
