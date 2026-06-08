@@ -639,7 +639,7 @@ async def core_proxy(request: Request):
                 return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
             else:
                 # Optimized Streaming: Check status before yielding
-                resp_stream = await proxy_client.stream("POST", f"{BASE_URL}/v1/chat/completions", headers=headers, json=body_json, timeout=90.0)
+                resp_stream = proxy_client.stream("POST", f"{BASE_URL}/v1/chat/completions", headers=headers, json=body_json, timeout=90.0)
                 await resp_stream.__aenter__()
                 
                 if resp_stream.status_code in (401, 403):
