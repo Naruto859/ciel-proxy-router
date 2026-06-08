@@ -45,7 +45,7 @@
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
         
-        /* 3D Card CSS (Adapted from Smit-Prajapati) */
+        /* 3D Card CSS */
         .parent-card {
             width: 100%;
             height: 280px;
@@ -161,60 +161,37 @@
             z-index: 40;
             transition: transform 0.3s;
         }
-        .fab:hover {
-            transform: scale(1.1) rotate(90deg);
-        }
+        .fab:hover { transform: scale(1.1) rotate(90deg); }
 
-        /* Refresh Button Animation */
-        .refresh-btn {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: white;
-            transition: all 0.3s;
-        }
-        .refresh-btn:active .refresh-icon {
-            transform: rotate(180deg);
-            transition: transform 0.3s;
-        }
+        .refresh-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; transition: all 0.3s; }
+        .refresh-btn:active .refresh-icon { transform: rotate(180deg); transition: transform 0.3s; }
 
-        /* Overlays */
-        .overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(20px);
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 1;
-            transition: opacity 0.3s;
-        }
-        .overlay.hide {
-            opacity: 0;
-            pointer-events: none;
-        }
+        .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(20px); z-index: 100; display: flex; align-items: center; justify-content: center; opacity: 1; transition: opacity 0.3s; }
+        .overlay.hide { opacity: 0; pointer-events: none; }
 
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
 
-        /* Progress Bar Base */
         .progress-bar-bg { background-color: rgba(255,255,255,0.1); border-radius: 9999px; height: 8px; overflow: hidden; }
         .progress-bar-fill { background: linear-gradient(90deg, #00ffd6, #8b5cf6); height: 100%; border-radius: 9999px; transition: width 1s ease-out; }
 
         @media (max-width: 768px) {
-            body {
-                transform: scale(0.60);
-                transform-origin: top left;
-                width: 166vw;
-                height: 166vh;
-                overflow-x: hidden;
-                overflow-y: auto;
-            }
+            body { transform: scale(0.60); transform-origin: top left; width: 166vw; height: 166vh; overflow-x: hidden; overflow-y: auto; }
         }
+    
+        .toast { position: fixed; top: 24px; right: 24px; padding: 12px 24px; border-radius: 12px; background: rgba(0,0,0,0.9); border: 1px solid var(--accent); color: white; z-index: 10000; opacity: 0; transform: translateY(-20px); transition: all 0.3s; pointer-events: none; }
+        .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+        .toast.error { border-color: #ff4d4d; }
+        .custom-select { position: relative; width: 100%; z-index: 50; margin-top: 10px; pointer-events: auto; }
+        .select-trigger { background: rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 12px; font-size: 0.75rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; color: #022c22; font-weight: 900; }
+        .card-3d.dead .select-trigger, .card-3d.normal .select-trigger { color: white; }
+        .select-options { position: absolute; top: 100%; left: 0; right: 0; background: #1a1a2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; margin-top: 4px; max-height: 150px; overflow-y: auto; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 100; }
+        .select-options.show { display: block; }
+        .option-item { padding: 8px 12px; font-size: 0.75rem; cursor: pointer; color: white; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .option-item:hover { background: var(--accent); color: #000; }
+        .scroll-lock { overflow: hidden !important; height: 100vh !important; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -250,10 +227,10 @@
                     <svg class="w-4 h-4 refresh-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     <span class="hidden md:inline">Refresh</span>
                 </button>
-                <!-- 3-Dot Menu -->
                 <div class="relative">
                     <button onclick="toggleMenu()" class="refresh-btn p-2 rounded-xl text-xl leading-none w-10 h-10 flex items-center justify-center">⋮</button>
                     <div id="dropdown-menu" class="absolute right-0 mt-2 w-48 glass-panel py-2 hidden flex-col z-50">
+                        <button onclick="showPollingModal(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full uppercase font-black">Polling Interval</button>
                         <button onclick="showPasswordModal(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full">Change Password</button>
                         <button onclick="logout()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-red-400 w-full border-t border-white/10 mt-1 pt-2">Logout</button>
                     </div>
@@ -261,9 +238,7 @@
             </div>
         </header>
 
-        <!-- Analytics Summary & Stats (Glassmorphism UI) -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <!-- Global Stats -->
             <div class="glass-panel p-6 flex flex-col justify-center">
                 <div class="flex justify-between items-center mb-4">
                     <p class="text-slate-400 font-medium">Upstream Balance</p>
@@ -273,30 +248,29 @@
                 <p class="text-sm text-slate-500 mt-2"><span id="stat-active-keys" class="text-white font-bold">0</span> Active Keys available</p>
             </div>
 
-            <!-- Analytics Card (Adapted from emmanuelh-dev snippet) -->
             <div class="glass-panel p-6 lg:col-span-2">
                 <h3 class="text-lg font-bold text-white mb-6 flex items-center gap-2">
                     <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                    Usage Analytics (Requests)
+                    Usage Analytics
                 </h3>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
                     <div>
-                        <p class="text-slate-400 text-xs font-mono mb-1">TODAY (24H)</p>
+                        <p class="text-slate-400 text-xs font-mono mb-1">TODAY</p>
                         <p class="text-2xl font-bold text-white mb-2" id="ana-today">0</p>
                         <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-today" style="width: 0%"></div></div>
                     </div>
                     <div>
-                        <p class="text-slate-400 text-xs font-mono mb-1">THIS WEEK</p>
+                        <p class="text-slate-400 text-xs font-mono mb-1">WEEK</p>
                         <p class="text-2xl font-bold text-white mb-2" id="ana-week">0</p>
                         <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-week" style="width: 0%"></div></div>
                     </div>
                     <div>
-                        <p class="text-slate-400 text-xs font-mono mb-1">THIS MONTH</p>
+                        <p class="text-slate-400 text-xs font-mono mb-1">MONTH</p>
                         <p class="text-2xl font-bold text-white mb-2" id="ana-month">0</p>
                         <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-month" style="width: 0%"></div></div>
                     </div>
                     <div>
-                        <p class="text-slate-400 text-xs font-mono mb-1">THIS YEAR</p>
+                        <p class="text-slate-400 text-xs font-mono mb-1">YEAR</p>
                         <p class="text-2xl font-bold text-white mb-2" id="ana-year">0</p>
                         <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-year" style="width: 0%"></div></div>
                     </div>
@@ -304,283 +278,216 @@
             </div>
         </div>
 
-        <!-- Navigation Tabs -->
         <div class="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
             <button onclick="switchTab('upstream')" id="tab-upstream" class="whitespace-nowrap px-6 py-3 rounded-full bg-white/10 text-white font-bold transition-all border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.1)]">3D Upstream Keys</button>
+            <button onclick="switchTab('proxies')" id="tab-proxies" class="whitespace-nowrap px-6 py-3 rounded-full bg-transparent text-slate-400 font-medium hover:text-white transition-all">Isolated IPs</button>
             <button onclick="switchTab('clients')" id="tab-clients" class="whitespace-nowrap px-6 py-3 rounded-full bg-transparent text-slate-400 font-medium hover:text-white transition-all">Client Agents</button>
             <button onclick="switchTab('logs')" id="tab-logs" class="whitespace-nowrap px-6 py-3 rounded-full bg-transparent text-slate-400 font-medium hover:text-white transition-all">System Console</button>
         </div>
 
-        <!-- Upstream 3D Grid -->
         <div id="section-upstream" class="transition-all duration-500">
             <div class="glass-panel p-6 mb-6">
                 <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
                     <div>
                         <h2 class="text-xl font-bold text-white">Upstream Nodes</h2>
-                        <p class="text-sm text-slate-400">Manage your connected API keys.</p>
+                        <p class="text-sm text-slate-400">Manage connected API keys.</p>
                     </div>
                     <div class="flex w-full md:w-auto gap-2">
-                        <input type="text" id="new-key-inline" placeholder="Enter new API Key (sk-...)" class="flex-1 md:w-64 bg-black/50 border border-white/10 px-4 py-3 rounded-xl text-sm focus:border-[#00ffd6] outline-none text-white transition-colors">
-                        <button onclick="addKeyInline()" class="bg-gradient-to-r from-[#00ffd6] to-[#08e260] text-slate-900 px-6 py-3 rounded-xl font-bold hover:shadow-[0_0_15px_rgba(0,255,214,0.5)] transition-all whitespace-nowrap">Add Node</button>
+                        <input type="text" id="new-key-inline" placeholder="API Key (sk-...)" class="flex-1 md:w-64 bg-black/50 border border-white/10 px-4 py-3 rounded-xl text-sm focus:border-[#00ffd6] outline-none text-white">
+                        <button onclick="addKeyInline()" class="bg-gradient-to-r from-[#00ffd6] to-[#08e260] text-slate-900 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap">Add Node</button>
                     </div>
                 </div>
             </div>
-            
-            <div id="keys-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-24">
-                <!-- 3D Cards Inject Here -->
-            </div>
+            <div id="keys-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-24"></div>
         </div>
 
-        <!-- Clients Section -->
+        <div id="section-proxies" class="hidden transition-all duration-500">
+            <div class="glass-panel p-6 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div>
+                    <h2 class="text-xl font-bold text-white uppercase tracking-widest">Isolated Nodes</h2>
+                    <p class="text-xs text-slate-400 mt-1 uppercase opacity-50">Manage dedicated routing endpoints.</p>
+                </div>
+                <button onclick="showModal('modal-add-proxy')" class="bg-gradient-to-r from-[#00ffd6] to-[#08e260] text-slate-900 px-6 py-3 rounded-xl font-black text-sm">ADD NEW IP</button>
+            </div>
+            <div id="proxies-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-24"></div>
+        </div>
+
         <div id="section-clients" class="hidden transition-all duration-500">
             <div class="glass-panel p-6 mb-6">
                 <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
                     <div>
                         <h2 class="text-xl font-bold text-white">Client Agent Keys</h2>
-                        <p class="text-sm text-slate-400">Generate keys for Hermes or other clients.</p>
+                        <p class="text-sm text-slate-400">Generate keys for Hermes agents.</p>
                     </div>
                     <div class="flex w-full md:w-auto gap-2">
-                        <input type="text" id="new-client-name" placeholder="Agent Name (e.g. Hermes)" class="flex-1 md:w-64 bg-black/50 border border-white/10 px-4 py-3 rounded-xl text-sm focus:border-[#00ffd6] outline-none text-white transition-colors">
-                        <button onclick="addClientKey()" class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl font-bold hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all whitespace-nowrap">Generate</button>
+                        <input type="text" id="new-client-name" placeholder="Agent Name" class="flex-1 md:w-64 bg-black/50 border border-white/10 px-4 py-3 rounded-xl text-sm focus:border-[#00ffd6] outline-none text-white">
+                        <button onclick="addClientKey()" class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap">Generate</button>
                     </div>
                 </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="client-keys-grid">
-                <!-- Client Cards Inject Here -->
-            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="client-keys-grid"></div>
         </div>
 
-        <!-- Logs Section -->
         <div id="section-logs" class="hidden transition-all duration-500 pb-10">
             <div class="glass-panel overflow-hidden border border-[#00ffd6]/30 shadow-[0_0_30px_rgba(0,255,214,0.1)]">
                 <div class="bg-slate-900/80 p-4 border-b border-white/10 flex gap-2 items-center">
-                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
-                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div><div class="w-3 h-3 rounded-full bg-yellow-500"></div><div class="w-3 h-3 rounded-full bg-green-500"></div>
                     <span class="ml-2 text-xs font-mono text-slate-400">ciel-proxy@server:~</span>
                 </div>
-                <div class="p-6 bg-black font-mono text-[#00ffd6] text-sm h-[60vh] overflow-y-auto leading-relaxed" id="console-output">
-                    <!-- Logs -->
-                </div>
+                <div class="p-6 bg-black font-mono text-[#00ffd6] text-sm h-[60vh] overflow-y-auto leading-relaxed" id="console-output"></div>
             </div>
         </div>
-
     </main>
 
-    <!-- Modal for Adding Upstream Key -->
-    <div id="add-modal" class="overlay hide">
-        <div class="glass-panel p-8 w-full max-w-md mx-4">
-            <h2 class="text-2xl font-bold mb-6 text-white">Add Upstream Key</h2>
-            <div class="space-y-4">
-                <div>
-                    <label class="text-sm text-slate-400 block mb-2 font-mono">KEY STRING</label>
-                    <input type="text" id="new-key" placeholder="sk-..." class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none focus:border-[#00ffd6]">
-                </div>
-                <div>
-                    <label class="text-sm text-slate-400 block mb-2 font-mono">PRIORITY (High = First)</label>
-                    <input type="number" id="new-priority" value="0" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none focus:border-[#00ffd6]">
-                </div>
-                <div class="flex gap-4 mt-8">
-                    <button onclick="hideAddModal()" class="flex-1 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all font-bold">Cancel</button>
-                    <button onclick="addKey()" class="flex-1 p-4 rounded-xl bg-[#00ffd6] text-slate-900 font-black hover:shadow-[0_0_20px_rgba(0,255,214,0.4)] transition-all">Save Key</button>
-                </div>
+    <!-- Modals -->
+    <div id="modal-verify" class="overlay hide">
+        <div class="glass-panel p-8 w-full max-w-md mx-4 border border-accent/30 shadow-[0_0_50px_rgba(0,255,214,0.1)] text-center">
+            <h2 class="text-2xl font-black mb-6">Technical Summary</h2>
+            <div class="space-y-4 font-mono text-sm text-left">
+                <div class="bg-black/40 p-4 rounded-xl border border-white/5"><p class="opacity-50 text-[10px] uppercase font-bold">Routing IP</p><p id="v-ip" class="text-accent text-lg font-bold">...</p></div>
+                <div class="bg-black/40 p-4 rounded-xl border border-white/5"><p class="opacity-50 text-[10px] uppercase font-bold">Live Balance</p><p id="v-bal" class="text-white text-xl font-bold">...</p></div>
+                <div class="bg-black/40 p-4 rounded-xl border border-white/5"><p class="opacity-50 text-[10px] uppercase font-bold">Status</p><p id="v-status" class="font-bold">...</p></div>
             </div>
+            <button onclick="hideModal('modal-verify')" class="w-full mt-6 p-4 rounded-xl bg-white/10 font-black uppercase text-xs">Close</button>
         </div>
     </div>
-    
-    <!-- Modal for Changing Password -->
-    <div id="password-modal" class="overlay hide">
+
+    <div id="modal-add-proxy" class="overlay hide">
         <div class="glass-panel p-8 w-full max-w-md mx-4">
-            <h2 class="text-2xl font-bold mb-6 text-white">System Password</h2>
-            <div class="space-y-4">
-                <div>
-                    <label class="text-sm text-slate-400 block mb-2 font-mono">NEW PASSWORD</label>
-                    <input type="password" id="new-password" placeholder="••••••••" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none focus:border-red-400">
-                </div>
-                <div class="flex gap-4 mt-8">
-                    <button onclick="hidePasswordModal()" class="flex-1 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all font-bold">Cancel</button>
-                    <button onclick="changePassword()" class="flex-1 p-4 rounded-xl bg-red-500 text-white font-black hover:shadow-[0_0_20px_rgba(239,68,68,0.4)] transition-all">Update</button>
-                </div>
+            <h2 class="text-xl font-bold mb-4 uppercase text-white">Add Isolated Node</h2>
+            <div class="space-y-3">
+                <input id="p-ip" type="text" placeholder="IP Address" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none">
+                <input id="p-port" type="number" placeholder="Port" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none">
+                <input id="p-user" type="text" placeholder="Username (Optional)" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none">
+                <input id="p-pass" type="password" placeholder="Password (Optional)" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none">
+                <div class="flex gap-4 pt-4"><button onclick="hideModal('modal-add-proxy')" class="flex-1 p-4 rounded-xl bg-white/5">CANCEL</button><button onclick="saveProxy()" class="flex-1 p-4 rounded-xl bg-accent text-black font-black">SAVE IP</button></div>
             </div>
         </div>
     </div>
 
-    <!-- Modal for New Client Key -->
-    <div id="new-client-key-modal" class="overlay hide">
-        <div class="glass-panel p-8 w-full max-w-md mx-4 border border-[#00ffd6]/50">
-            <div class="flex items-center gap-3 mb-4 text-[#00ffd6]">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <h2 class="text-2xl font-bold">Agent Key Ready</h2>
-            </div>
-            <p class="text-red-400 text-sm mb-6 font-bold bg-red-500/10 p-3 rounded-lg border border-red-500/20">WARNING: Copy this key immediately. It will not be shown again.</p>
-            <div class="space-y-4">
-                <input type="text" id="display-new-client-key" readonly class="w-full bg-black border border-[#00ffd6]/30 p-4 rounded-xl font-mono text-center text-lg text-[#00ffd6] shadow-inner outline-none">
-                <div class="flex mt-8">
-                    <button onclick="closeNewClientKeyModal()" class="w-full p-4 rounded-xl bg-white/10 hover:bg-white/20 font-bold transition-all border border-white/10">I have saved it</button>
-                </div>
-            </div>
+    <div id="modal-polling" class="overlay hide">
+        <div class="glass-panel p-8 w-full max-w-sm mx-4 text-center">
+            <h2 class="text-xl font-bold mb-4 text-white uppercase">Kernel Settings</h2>
+            <p class="text-[10px] opacity-50 mb-4 font-bold">Polling Interval (Seconds)</p>
+            <input id="poll-sec" type="number" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-center text-2xl font-black text-accent mb-6 outline-none">
+            <div class="flex gap-3"><button onclick="hideModal('modal-polling')" class="flex-1 p-3 rounded-xl bg-white/5">Cancel</button><button onclick="savePolling()" class="flex-1 p-3 rounded-xl bg-accent text-black font-bold">Update</button></div>
         </div>
     </div>
+
+    <div id="password-modal" class="overlay hide">
+        <div class="glass-panel p-8 w-full max-w-md mx-4">
+            <h2 class="text-2xl font-bold mb-6 text-white">Change Admin Password</h2>
+            <input type="password" id="new-password" placeholder="New Password" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none mb-6">
+            <div class="flex gap-4"><button onclick="hideModal('password-modal')" class="flex-1 p-4 rounded-xl bg-white/5">Cancel</button><button onclick="updatePassword()" class="flex-1 p-4 rounded-xl bg-red-500 text-white font-black">Update</button></div>
+        </div>
+    </div>
+
+    <div id="new-client-key-modal" class="overlay hide">
+        <div class="glass-panel p-8 w-full max-w-md mx-4 border border-accent/50 text-center">
+            <h2 class="text-2xl font-bold text-accent mb-4">Agent Key Ready</h2>
+            <p class="text-red-400 text-sm mb-6 bg-red-500/10 p-3 rounded-lg">Copy this key immediately. It will not be shown again.</p>
+            <input type="text" id="display-new-client-key" readonly class="w-full bg-black border border-accent/30 p-4 rounded-xl font-mono text-center text-accent outline-none">
+            <button onclick="hideModal('new-client-key-modal')" class="w-full mt-8 p-4 rounded-xl bg-white/10 font-bold">I have saved it</button>
+        </div>
+    </div>
+
+    <div id="modal-confirm" class="overlay hide" style="z-index: 10001;">
+        <div class="glass-panel p-8 w-full max-w-sm mx-4 text-center border border-red-500/30">
+            <h2 class="text-xl font-black mb-4 uppercase">Confirm Action</h2>
+            <p id="confirm-msg" class="text-sm text-slate-400 mb-8 font-mono">Are you sure?</p>
+            <div class="flex gap-4"><button onclick="hideModal('modal-confirm')" class="flex-1 p-3 rounded-xl bg-white/5">CANCEL</button><button onclick="proceedConfirm()" class="flex-1 p-3 rounded-xl bg-red-500/20 text-red-500 font-bold border border-red-500/20">PROCEED</button></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
 
     <script>
         let sessionToken = localStorage.getItem('ciel_session') || '';
-        let logInterval = null;
+        let logInterval = null; let globalProxies = []; let pendingConfirmCallback = null;
 
-        // --- Core UI Functions ---
-        function toggleMenu() {
-            const menu = document.getElementById('dropdown-menu');
-            menu.classList.toggle('hidden');
-            menu.classList.toggle('flex');
-        }
-
-        document.addEventListener('click', (e) => {
-            const menu = document.getElementById('dropdown-menu');
-            const btn = menu.previousElementSibling;
-            if(!menu.contains(e.target) && !btn.contains(e.target)) {
-                menu.classList.add('hidden');
-                menu.classList.remove('flex');
-            }
-        });
-
-        function switchTab(tabId) {
-            ['upstream', 'clients', 'logs'].forEach(id => {
-                document.getElementById(`tab-${id}`).className = 'whitespace-nowrap px-6 py-3 rounded-full bg-transparent text-slate-400 font-medium hover:text-white transition-all';
-                document.getElementById(`section-${id}`).classList.add('hidden');
+        function showToast(msg, isErr=false) { const t = document.getElementById('toast'); t.innerText = msg; t.className = `toast show ${isErr?'error':''}`; setTimeout(()=>t.classList.remove('show'), 4000); }
+        function showModal(id) { document.getElementById(id).classList.remove('hide'); }
+        function hideModal(id) { document.getElementById(id).classList.add('hide'); }
+        function customConfirm(msg, cb) { document.getElementById('confirm-msg').innerText = msg; showModal('modal-confirm'); pendingConfirmCallback = cb; }
+        function proceedConfirm() { if(pendingConfirmCallback) pendingConfirmCallback(); hideModal('modal-confirm'); }
+        function toggleDrop(id) { document.querySelectorAll('.select-options').forEach(el=>{if(el.id!=='opt-'+id) el.classList.remove('show')}); document.getElementById('opt-'+id).classList.toggle('show'); }
+        
+        async function setKeyProxy(k, pid) { await fetch('/admin/keys/proxy', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({key:k, proxy_id:pid?parseInt(pid):null}) }); refreshData(); }
+        function toggleMenu() { const menu = document.getElementById('dropdown-menu'); menu.classList.toggle('hidden'); menu.classList.toggle('flex'); }
+        
+        function switchTab(id) {
+            ['upstream', 'proxies', 'clients', 'logs'].forEach(t => {
+                const tab = document.getElementById(`tab-${t}`); const sec = document.getElementById(`section-${t}`);
+                if(tab) tab.className = 'whitespace-nowrap px-6 py-3 rounded-full bg-transparent text-slate-400 font-medium hover:text-white transition-all';
+                if(sec) sec.classList.add('hidden');
             });
-            
-            const activeTab = document.getElementById(`tab-${tabId}`);
-            activeTab.className = 'whitespace-nowrap px-6 py-3 rounded-full bg-white/10 text-white font-bold transition-all border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.1)]';
-            document.getElementById(`section-${tabId}`).classList.remove('hidden');
+            const activeTab = document.getElementById(`tab-${id}`); const activeSec = document.getElementById(`section-${id}`);
+            if(activeTab) activeTab.className = 'whitespace-nowrap px-6 py-3 rounded-full bg-white/10 text-white font-bold transition-all border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.1)]';
+            if(activeSec) activeSec.classList.remove('hidden');
         }
+
+        async function login() {
+            const pin = document.getElementById('pin-input').value;
+            const res = await fetch('/admin/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
+            if (res.ok) {
+                const data = await res.json(); sessionToken = data.token; localStorage.setItem('ciel_session', sessionToken);
+                document.getElementById('login-overlay').classList.add('hide');
+                const dash = document.getElementById('dashboard'); dash.classList.remove('hidden');
+                setTimeout(() => dash.classList.remove('opacity-0'), 50);
+                refreshAll(); startLogPolling();
+            } else { alert('Invalid Password'); }
+        }
+
+        function logout() { sessionToken = ''; localStorage.removeItem('ciel_session'); location.reload(); }
 
         window.onload = async () => {
             if (sessionToken) {
-                try {
-                    const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                    if (res.ok) {
-                        document.getElementById('login-overlay').classList.add('hide');
-                        const dashboard = document.getElementById('dashboard');
-                        dashboard.classList.remove('hidden');
-                        setTimeout(() => dashboard.classList.remove('opacity-0'), 50);
-                        refreshAll();
-                        startLogPolling();
-                    } else {
-                        logout();
-                    }
-                } catch (e) {
-                    logout();
-                }
+                const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
+                if (res.ok) {
+                    document.getElementById('login-overlay').classList.add('hide');
+                    const dash = document.getElementById('dashboard'); dash.classList.remove('hidden');
+                    setTimeout(() => dash.classList.remove('opacity-0'), 50);
+                    refreshAll(); startLogPolling();
+                } else { logout(); }
             }
         };
 
-        // --- Auth ---
-        async function login() {
-            const pin = document.getElementById('pin-input').value;
-            try {
-                const res = await fetch('/admin/auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pin })
-                });
-                
-                if (res.ok) {
-                    const data = await res.json();
-                    sessionToken = data.token;
-                    localStorage.setItem('ciel_session', sessionToken);
-                    document.getElementById('login-overlay').classList.add('hide');
-                    const dashboard = document.getElementById('dashboard');
-                    dashboard.classList.remove('hidden');
-                    setTimeout(() => dashboard.classList.remove('opacity-0'), 50);
-                    refreshAll();
-                    startLogPolling();
-                } else {
-                    alert('Invalid System Password');
-                }
-            } catch (e) {
-                alert('Connection Error');
-            }
-        }
+        async function refreshAll() { refreshData(); refreshClientKeys(); refreshAnalytics(); }
 
-        function logout() {
-            sessionToken = '';
-            localStorage.removeItem('ciel_session');
-            if(logInterval) clearInterval(logInterval);
-            location.reload();
-        }
-
-        async function refreshAll() {
-            refreshData();
-            refreshClientKeys();
-            refreshAnalytics();
-        }
-
-        // --- Data Fetching ---
         async function refreshAnalytics() {
             try {
                 const res = await fetch('/admin/analytics', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                if(!res.ok) return;
                 const data = await res.json();
-                
                 document.getElementById('ana-today').innerText = data.today;
                 document.getElementById('ana-week').innerText = data.this_week;
                 document.getElementById('ana-month').innerText = data.this_month;
                 document.getElementById('ana-year').innerText = data.this_year;
-
-                // Max scale reference for progress bars (dynamic based on year max, clamped for visual)
                 const max = Math.max(data.this_year, 100);
                 document.getElementById('bar-today').style.width = Math.min((data.today / max) * 100 * 365, 100) + '%';
                 document.getElementById('bar-week').style.width = Math.min((data.this_week / max) * 100 * 52, 100) + '%';
                 document.getElementById('bar-month').style.width = Math.min((data.this_month / max) * 100 * 12, 100) + '%';
                 document.getElementById('bar-year').style.width = Math.min((data.this_year / max) * 100, 100) + '%';
-
             } catch(e) {}
         }
 
         async function refreshData() {
             try {
-                const res = await fetch('/admin/keys', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                const data = await res.json();
-                
-                const grid = document.getElementById('keys-grid');
-                grid.innerHTML = '';
-                
-                let total = 0;
-                let active = 0;
-
-                data.keys.forEach(k => {
-                    const isHealthy = k.balance > 0;
-                    if(isHealthy) active++;
-                    total += (isHealthy ? k.balance : 0);
-
-                    const isPrimary = k.priority > 0;
-                    const cardClass = isPrimary ? 'card-3d normal' : (isHealthy ? 'card-3d' : 'card-3d dead');
-                    const titleColor = isPrimary ? 'text-white' : (isHealthy ? 'text-slate-900' : 'text-white');
-                    const subtitleColor = isPrimary ? 'text-purple-200' : (isHealthy ? 'text-slate-800' : 'text-red-200');
-
-                    grid.innerHTML += `
-                        <div class="parent-card">
-                            <div class="${cardClass}">
-                                <div class="glass-inner"></div>
-                                <div class="content-3d">
-                                    <span class="title ${titleColor}">${k.key.substring(0, 12)}...</span>
-                                    <span class="text ${subtitleColor} block mt-4">Priority: ${isPrimary ? 'PRIMARY' : 'NORMAL'}</span>
-                                    <span class="text ${subtitleColor} block font-mono text-xl mt-1">${k.balance.toFixed(4)} <span class="text-sm">P</span></span>
-                                    <span class="text ${subtitleColor} block mt-2 flex items-center gap-2">
-                                        <span class="w-2 h-2 rounded-full ${isHealthy ? 'bg-white shadow-[0_0_8px_white]' : 'bg-black'}"></span>
-                                        ${isHealthy ? 'Active & Ready' : 'Depleted/Blocked'}
-                                    </span>
-                                </div>
-                                <div class="bottom-3d">
-                                    <button onclick="testKey('${k.key}')" class="action-btn">Verify</button>
-                                    <button onclick="deleteKey('${k.key}')" class="action-btn !bg-black/30 !text-white hover:!bg-black/50 !border-transparent">Revoke</button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
+                const [resK, resP] = await Promise.all([
+                    fetch('/admin/keys', { headers: { 'Authorization': `Bearer ${sessionToken}` }}),
+                    fetch('/admin/proxies', { headers: { 'Authorization': `Bearer ${sessionToken}` }})
+                ]);
+                const keys = (await resK.json()).keys || []; globalProxies = (await resP.json()).proxies || [];
+                const gridK = document.getElementById('keys-grid'); gridK.innerHTML = '';
+                keys.forEach(k => {
+                    const isH = k.balance > 0; const proxy = globalProxies.find(p=>p.id===k.proxy_id); const pLabel = proxy ? proxy.ip : 'VPS IP (Direct)';
+                    const tCol = isH ? '#022c22' : 'white'; const sCol = isH ? 'rgba(2,44,34,0.7)' : 'rgba(255,255,255,0.7)';
+                    const selCls = isH ? 'bg-black/10 border-[#022c22]/20 text-[#022c22]' : 'bg-black/30 border-white/20 text-white';
+                    gridK.innerHTML += `<div class="parent-card"><div class="card-3d ${k.priority>0?'normal':(isH?'':'dead')}"><div class="glass-inner"></div><div class="content-3d"><span class="title" style="color:${tCol}">${k.key.substring(0,14)}...</span><div class="custom-select" onclick="event.stopPropagation()"><div class="select-trigger ${selCls}" onclick="toggleDrop('${k.key.substring(0,8)}')"><span>${pLabel}</span><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg></div><div class="select-options" id="opt-${k.key.substring(0,8)}"><div class="option-item" onclick="setKeyProxy('${k.key}', null)">VPS IP (Direct)</div>${globalProxies.map(p=>`<div class="option-item" onclick="setKeyProxy('${k.key}', ${p.id})">${p.ip}</div>`).join('')}</div></div><div style="margin-top:15px"><p style="font-size:9px; font-weight:900; color:${sCol}">BALANCE</p><p style="font-size:1.5rem; font-weight:900; color:${tCol}; font-family:monospace;">${(k.balance>0?k.balance:0).toFixed(4)} P</p></div><div style="margin-top:10px; display:flex; align-items:center; gap:5px; font-size:10px; font-weight:900; color:${sCol}"><div style="width:8px; height:8px; border-radius:50%; background:${isH?'#022c22':'#000'}"></div>${isH?'OPERATIONAL':'BLOCKED'}</div></div><div class="bottom-3d z-10"><button onclick="testKey('${k.key}')" class="action-btn">Verify</button><button onclick="deleteKey('${k.key}')" class="action-btn" style="background:rgba(0,0,0,0.1); border:none; color:${isH?'#022c22':'white'}">Revoke</button></div></div></div>`;
                 });
-
-                document.getElementById('stat-active-keys').innerText = active;
-                document.getElementById('stat-total-pollen').innerText = total.toFixed(4);
+                const gridP = document.getElementById('proxies-grid'); gridP.innerHTML = '';
+                globalProxies.forEach(p => { gridP.innerHTML += `<div class="parent-card" style="height:220px; width:240px;"><div class="card-3d normal"><div class="glass-inner"></div><div class="content-3d"><span class="title" style="color:#022c22; font-family:monospace; font-size:1.1rem;">${p.ip}</span><p style="font-size:10px; color:rgba(2,44,34,0.6); margin-top:5px; font-weight:900">PORT: ${p.port}</p><div id="ps-${p.id}" class="mt-2 text-[10px] font-mono font-bold hidden"></div></div><div class="bottom-3d"><button onclick="testProxy(${p.id})" class="action-btn">Test</button><button onclick="deleteProxy(${p.id})" class="action-btn !bg-black/10 !border-transparent">Remove</button></div></div></div>`; });
+                document.getElementById('stat-total-pollen').innerText = keys.reduce((a,b)=>a+(b.balance>0?b.balance:0),0).toFixed(4);
+                document.getElementById('stat-active-keys').innerText = keys.filter(k=>k.balance>0).length;
             } catch(e) {}
         }
 
@@ -588,142 +495,56 @@
             try {
                 const res = await fetch('/admin/client-keys', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
                 const data = await res.json();
-                
-                const grid = document.getElementById('client-keys-grid');
-                grid.innerHTML = '';
-                
+                const grid = document.getElementById('client-keys-grid'); grid.innerHTML = '';
                 data.keys.forEach(k => {
-                    grid.innerHTML += `
-                        <div class="glass-panel p-6 relative overflow-hidden group">
-                            <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                            <h3 class="text-xl font-bold text-white mb-1 relative z-10">${k.name}</h3>
-                            <p class="font-mono text-sm text-[#00ffd6] mb-4 relative z-10">${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}</p>
-                            <div class="flex justify-between items-center relative z-10">
-                                <span class="text-xs text-slate-500">${new Date(k.created_at).toLocaleDateString()}</span>
-                                <button onclick="deleteClientKey('${k.key}')" class="text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded-lg hover:bg-red-500 hover:text-white transition-all">Revoke</button>
-                            </div>
-                        </div>
-                    `;
+                    grid.innerHTML += `<div class="glass-panel p-6 relative overflow-hidden group"><div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div><h3 class="text-xl font-bold text-white mb-1 relative z-10">${k.name}</h3><p class="font-mono text-sm text-[#00ffd6] mb-4 relative z-10">${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}</p><div class="flex justify-between items-center relative z-10"><span class="text-xs text-slate-500">${new Date(k.created_at).toLocaleDateString()}</span><button onclick="deleteClientKey('${k.key}')" class="text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded-lg hover:bg-red-500 hover:text-white transition-all">Revoke</button></div></div>`;
                 });
             } catch(e) {}
         }
 
-        function startLogPolling() {
-            if (logInterval) clearInterval(logInterval);
-            fetchLogs();
-            logInterval = setInterval(fetchLogs, 5000);
-        }
-        
+        function startLogPolling() { if (logInterval) clearInterval(logInterval); fetchLogs(); logInterval = setInterval(fetchLogs, 5000); }
         async function fetchLogs() {
             try {
                 const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
                 if (res.ok) {
-                    const data = await res.json();
-                    const consoleDiv = document.getElementById('console-output');
+                    const data = await res.json(); const consoleDiv = document.getElementById('console-output');
                     let wasAtBottom = (consoleDiv.scrollHeight - consoleDiv.scrollTop <= consoleDiv.clientHeight + 10);
-                    
                     consoleDiv.innerHTML = data.logs.join('<br>') + '<br><span class="animate-pulse">_</span>';
                     if (wasAtBottom) consoleDiv.scrollTop = consoleDiv.scrollHeight;
                 }
             } catch (e) {}
         }
 
-        // --- Modals & Actions ---
-        function showAddModal() { document.getElementById('add-modal').classList.remove('hide'); }
-        function hideAddModal() { document.getElementById('add-modal').classList.add('hide'); }
-        function showPasswordModal() { document.getElementById('password-modal').classList.remove('hide'); }
-        function hidePasswordModal() { document.getElementById('password-modal').classList.add('hide'); }
-        function closeNewClientKeyModal() { 
-            document.getElementById('new-client-key-modal').classList.add('hide'); 
-            document.getElementById('display-new-client-key').value = '';
-        }
-
-        async function addKey() {
-            const key = document.getElementById('new-key').value;
-            const priority = document.getElementById('new-priority').value;
-            if(!key) return alert("Key is required");
-            
-            await fetch('/admin/keys', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-                body: JSON.stringify({ key, priority: parseInt(priority) })
-            });
-            
-            document.getElementById('new-key').value = '';
-            hideAddModal();
-            refreshData();
-        }
-        
         async function addKeyInline() {
-            const key = document.getElementById('new-key-inline').value;
-            if(!key) return alert("API Key is required");
-            
-            await fetch('/admin/keys', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-                body: JSON.stringify({ key, priority: 0 })
-            });
-            
-            document.getElementById('new-key-inline').value = '';
-            refreshData();
-        }
-
-        async function deleteKey(key) {
-            if (!confirm('Remove this upstream key?')) return;
-            await fetch(`/admin/keys/${key}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` }});
-            refreshData();
-        }
-
-        async function testKey(key) {
-            try {
-                const res = await fetch(`/admin/test/${key}`, { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                const data = await res.json();
-                refreshData();
-                if (data.success) alert(`Success! Balance: ${data.balance}`);
-                else alert('Test failed. Key might be invalid or blocked.');
-            } catch (err) { alert('Network Error'); }
+            const key = document.getElementById('new-key-inline').value; if(!key) return alert("API Key is required");
+            await fetch('/admin/keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ key, priority: 0 }) });
+            document.getElementById('new-key-inline').value = ''; refreshData();
         }
 
         async function addClientKey() {
-            const name = document.getElementById('new-client-name').value;
-            if(!name) return alert("Agent name is required");
-            
-            const res = await fetch('/admin/client-keys', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-                body: JSON.stringify({ name })
-            });
-            
-            if(res.ok) {
-                const data = await res.json();
-                document.getElementById('new-client-name').value = '';
-                document.getElementById('display-new-client-key').value = data.key;
-                document.getElementById('new-client-key-modal').classList.remove('hide');
-                refreshClientKeys();
-            }
+            const name = document.getElementById('new-client-name').value; if(!name) return alert("Agent name is required");
+            const res = await fetch('/admin/client-keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ name }) });
+            if(res.ok) { const data = await res.json(); document.getElementById('new-client-name').value = ''; document.getElementById('display-new-client-key').value = data.key; showModal('new-client-key-modal'); refreshClientKeys(); }
         }
 
-        async function deleteClientKey(key) {
-            if (!confirm('CRITICAL: Revoke this Client Key?')) return;
-            await fetch(`/admin/client-keys/${key}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` }});
-            refreshClientKeys();
-        }
+        async function deleteKey(k) { customConfirm('Delete this upstream node?', async() => { await fetch('/admin/keys/'+k,{method:'DELETE',headers:{'Authorization':`Bearer ${sessionToken}`}}); refreshData(); }); }
+        async function deleteProxy(id) { customConfirm('Remove this IP endpoint?', async() => { await fetch('/admin/proxies/'+id,{method:'DELETE',headers:{'Authorization':`Bearer ${sessionToken}`}}); refreshData(); }); }
+        async function deleteClientKey(key) { customConfirm('Revoke this Client Key?', async() => { await fetch(`/admin/client-keys/${key}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` }}); refreshClientKeys(); }); }
 
-        async function changePassword() {
-            const new_password = document.getElementById('new-password').value;
-            if(!new_password) return alert("Password is required");
-            
-            const res = await fetch('/admin/password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-                body: JSON.stringify({ new_password })
-            });
-            
-            if(res.ok) {
-                alert("Password updated!");
-                document.getElementById('new-password').value = '';
-                hidePasswordModal();
-            }
+        async function testProxy(id) { const el=document.getElementById('ps-'+id); el.classList.remove('hidden'); el.innerText='PROBING...'; const res=await fetch('/admin/proxies/test/'+id, {headers:{'Authorization':`Bearer ${sessionToken}`}}); const d=await res.json(); if(d.success){ el.innerHTML=`<span style="color:#022c22">PASS: ${d.detected_ip}</span>`; showToast('Proxy Verified'); } else { el.innerHTML=`<span style="color:#ff5757">FAILED</span>`; showToast('Proxy Error',true); } }
+        async function testKey(k) { showToast('Verifying...'); try { const res=await fetch('/admin/test/'+k,{headers:{'Authorization':`Bearer ${sessionToken}`}}); const d=await res.json(); document.getElementById('v-ip').innerText=d.ip||'VPS IP (Direct)'; document.getElementById('v-bal').innerText=(d.balance>0?d.balance:0).toFixed(4)+' P'; document.getElementById('v-status').innerHTML=d.success?'<span style="color:#00ffd6">VERIFIED</span>':'<span style="color:#ff5757">FAILED</span>'; showModal('modal-verify'); refreshData(); } catch(e){showToast('Error',true);} }
+        async function showPollingModal() { const res=await fetch('/admin/settings/polling', {headers:{'Authorization':`Bearer ${sessionToken}`}}); if(res.ok){ document.getElementById('poll-sec').value=(await res.json()).interval; showModal('modal-polling'); } }
+        async function savePolling() { const s=parseInt(document.getElementById('poll-sec').value); if(s>=10){ await fetch('/admin/settings/polling',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({interval:s})}); hideModal('modal-polling'); showToast('Polling Updated'); } }
+        async function saveProxy() {
+            const ip=document.getElementById('p-ip').value, port=document.getElementById('p-port').value, user=document.getElementById('p-user').value, pass=document.getElementById('p-pass').value;
+            if(!ip || !port) return showToast('IP and Port required', true);
+            const res = await fetch('/admin/proxies', {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({ip, port:parseInt(port), username:user, password:pass})});
+            if(res.ok) { hideModal('modal-add-proxy'); refreshData(); showToast('Proxy Added'); }
+        }
+        async function updatePassword() {
+            const new_password = document.getElementById('new-password').value; if(!new_password) return alert("Password required");
+            const res = await fetch('/admin/password', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ new_password }) });
+            if(res.ok) { alert("Password updated!"); hideModal('password-modal'); }
         }
     </script>
 </body>

@@ -6,40 +6,36 @@ import logging
 import asyncio
 import secrets
 import bcrypt
+import httpx
 from typing import List, Dict, Optional
 from contextlib import asynccontextmanager
-
-from fastapi import FastAPI, Request, Depends, HTTPException, status, Response
-from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
-import httpx
 from datetime import datetime, timezone, timedelta
+from fastapi import FastAPI, Request, Response, HTTPException, Depends, status
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel
 from collections import deque
 
 # --- CONFIGURATION ---
 DB_PATH = "proxy_data.db"
 BASE_URL = "https://gen.pollinations.ai"
 SESSION_TOKEN = secrets.token_hex(16)
-
-# --- SYSTEM LOGS ---
-system_logs = deque(maxlen=50)
+system_logs = deque(maxlen=200)
 balance_check_lock = asyncio.Lock()
 last_wait_log_time = 0.0
 
-def add_log(msg: str):
-    ist = timezone(timedelta(hours=5, minutes=30))
-    ts = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S IST")
-    log_line = f"[{ts}] {msg}"
-    system_logs.append(log_line)
-    logger.info(msg)
-
-# --- LOGGING ---
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- DATABASE & MODELS ---
+def add_log(msg: str):
+    ist = timezone(timedelta(hours=5, minutes=30))
+    ts = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
+    full_msg = f"[{ts}] {msg}"
+    system_logs.append(full_msg)
+    logger.info(msg)
+
+# --- DATABASE MANAGER ---
 class DatabaseManager:
     def __init__(self, path: str):
         self.path = path
@@ -53,7 +49,20 @@ class DatabaseManager:
                     balance REAL DEFAULT -1.0,
                     priority INTEGER DEFAULT 0,
                     is_active INTEGER DEFAULT 1,
-                    last_checked TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    last_checked TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    proxy_id INTEGER,
+                    FOREIGN KEY (proxy_id) REFERENCES proxies (id)
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS proxies (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ip TEXT,
+                    port INTEGER,
+                    username TEXT,
+                    password TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             await conn.execute("""
@@ -64,12 +73,7 @@ class DatabaseManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS settings (
-                    name TEXT PRIMARY KEY,
-                    value TEXT
-                )
-            """)
+            await conn.execute("CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT)")
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS usage_stats (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,17 +84,10 @@ class DatabaseManager:
             """)
             await conn.execute("INSERT OR IGNORE INTO settings VALUES ('polling_interval', '300')")
             
-            # Default password hashing
+            # Default password
             default_pwd = "Samirandas123@"
             hashed_pwd = bcrypt.hashpw(default_pwd.encode(), bcrypt.gensalt()).decode()
             await conn.execute("INSERT OR IGNORE INTO settings VALUES ('admin_password', ?)", (hashed_pwd,))
-            await conn.commit()
-
-    async def log_usage(self, endpoint: str, status_code: int):
-        ist = timezone(timedelta(hours=5, minutes=30))
-        ts = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
-        async with aiosqlite.connect(self.path) as conn:
-            await conn.execute("INSERT INTO usage_stats (timestamp, endpoint, status_code) VALUES (?, ?, ?)", (ts, endpoint, status_code))
             await conn.commit()
 
     async def get_keys(self):
@@ -105,14 +102,43 @@ class DatabaseManager:
             await conn.execute("INSERT OR REPLACE INTO keys (key, priority) VALUES (?, ?)", (key, priority))
             await conn.commit()
 
-    async def delete_key(self, key: str):
+    async def update_key_proxy(self, key: str, proxy_id: Optional[int]):
         async with aiosqlite.connect(self.path) as conn:
-            await conn.execute("DELETE FROM keys WHERE key = ?", (key,))
+            await conn.execute("UPDATE keys SET proxy_id = ? WHERE key = ?", (proxy_id, key))
             await conn.commit()
 
     async def update_balance(self, key: str, balance: float):
         async with aiosqlite.connect(self.path) as conn:
             await conn.execute("UPDATE keys SET balance = ?, last_checked = CURRENT_TIMESTAMP WHERE key = ?", (balance, key))
+            await conn.commit()
+
+    async def delete_key(self, key: str):
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("DELETE FROM keys WHERE key = ?", (key,))
+            await conn.commit()
+
+    async def get_proxies(self):
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("SELECT * FROM proxies ORDER BY created_at DESC") as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def get_proxy_by_id(self, proxy_id: int):
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("SELECT * FROM proxies WHERE id = ?", (proxy_id,)) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+
+    async def add_proxy(self, ip: str, port: int, username: Optional[str] = None, password: Optional[str] = None):
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("INSERT INTO proxies (ip, port, username, password) VALUES (?, ?, ?, ?)", (ip, port, username, password))
+            await conn.commit()
+
+    async def delete_proxy(self, proxy_id: int):
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("DELETE FROM proxies WHERE id = ?", (proxy_id,))
             await conn.commit()
 
     async def get_client_keys(self):
@@ -129,18 +155,15 @@ class DatabaseManager:
             await conn.commit()
         return new_key
 
+    async def validate_client_key(self, key: str) -> bool:
+        async with aiosqlite.connect(self.path) as conn:
+            async with conn.execute("SELECT 1 FROM client_keys WHERE key = ? AND is_active = 1", (key,)) as cursor:
+                return await cursor.fetchone() is not None
+
     async def revoke_client_key(self, key: str):
         async with aiosqlite.connect(self.path) as conn:
             await conn.execute("DELETE FROM client_keys WHERE key = ?", (key,))
             await conn.commit()
-
-    async def validate_client_key(self, key: str) -> bool:
-        async with aiosqlite.connect(self.path) as conn:
-            async with conn.execute("SELECT is_active FROM client_keys WHERE key = ?", (key,)) as cursor:
-                row = await cursor.fetchone()
-                if row and row[0] == 1:
-                    return True
-                return False
 
     async def get_admin_password_hash(self) -> str:
         async with aiosqlite.connect(self.path) as conn:
@@ -160,12 +183,50 @@ class DatabaseManager:
                 row = await cursor.fetchone()
                 return int(row[0]) if row else 300
 
+    async def set_polling_interval(self, seconds: int):
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("UPDATE settings SET value = ? WHERE name = 'polling_interval'", (str(seconds),))
+            await conn.commit()
+
+    async def log_usage(self, endpoint: str, status_code: int):
+        ist = timezone(timedelta(hours=5, minutes=30))
+        ts = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("INSERT INTO usage_stats (timestamp, endpoint, status_code) VALUES (?, ?, ?)", (ts, endpoint, status_code))
+            await conn.commit()
+
 db = DatabaseManager(DB_PATH)
+
+# --- PROXY MANAGER ---
+class ProxyManager:
+    def __init__(self):
+        self.clients: Dict[int, httpx.AsyncClient] = {}
+        self.default_client = httpx.AsyncClient(timeout=900.0, follow_redirects=True)
+        self._lock = asyncio.Lock()
+
+    async def get_client_for_proxy(self, proxy: Dict) -> httpx.AsyncClient:
+        proxy_id = proxy['id']
+        async with self._lock:
+            if proxy_id not in self.clients:
+                auth = f"{proxy['username']}:{proxy['password']}@" if proxy['username'] and proxy['password'] else ""
+                proxy_url = f"http://{auth}{proxy['ip']}:{proxy['port']}"
+                self.clients[proxy_id] = httpx.AsyncClient(
+                    proxies=proxy_url,
+                    timeout=900.0,
+                    follow_redirects=True
+                )
+            return self.clients[proxy_id]
+
+    async def close_all(self):
+        await self.default_client.aclose()
+        for client in self.clients.values():
+            await client.aclose()
+
+proxy_manager = ProxyManager()
 
 # --- KEY MANAGER ---
 class KeyManager:
     def __init__(self):
-        self.client = httpx.AsyncClient(timeout=30.0)
         self.last_force_pull_time = 0.0
 
     async def get_best_key(self) -> Optional[Dict]:
@@ -175,58 +236,70 @@ class KeyManager:
                 return k
         return None
 
-    async def check_balance(self, key: str) -> float:
+    async def check_balance(self, key_data: Dict) -> tuple[float, str]:
+        key = key_data['key']
+        proxy_id = key_data.get('proxy_id')
+        proxy_info = "VPS IP (Direct)"
         try:
+            client = proxy_manager.default_client
+            if proxy_id:
+                proxy = await db.get_proxy_by_id(proxy_id)
+                if proxy:
+                    client = await proxy_manager.get_client_for_proxy(proxy)
+                    proxy_info = proxy['ip']
+            
             headers = {"Authorization": f"Bearer {key}", "User-Agent": "curl/8.5.0"}
-            response = await self.client.get(f"{BASE_URL}/account/balance", headers=headers, timeout=10.0)
+            response = await client.get(f"{BASE_URL}/account/balance", headers=headers, timeout=10.0)
             if response.status_code == 200:
                 balance = response.json().get("balance", 0.0)
                 await db.update_balance(key, balance)
-                return balance
+                add_log(f"Balance check SUCCESS for {key[:8]}... via {proxy_info}: {balance}")
+                return balance, proxy_info
             else:
                 await db.update_balance(key, 0.0)
-                return -2.0
+                add_log(f"Balance check FAILED (HTTP {response.status_code}) for {key[:8]}... via {proxy_info}")
+                return -2.0, proxy_info
         except Exception as e:
             logger.error(f"Balance check failed for {key[:10]}: {e}")
-        return -2.0
+        return -2.0, proxy_info
 
     async def force_pull_balances(self):
         async with balance_check_lock:
             current_time = asyncio.get_event_loop().time()
             if current_time - self.last_force_pull_time < 150.0:
-                # Throttle emergency pulls to once per 150 seconds globally
                 return
             self.last_force_pull_time = current_time
-            
-            logger.info("🚨 EMERGENCY: Triggering Force Pull...")
             keys = await db.get_keys()
-            if not keys:
-                return
-            tasks = [self.check_balance(k['key']) for k in keys]
+            if not keys: return
+            tasks = [self.check_balance(k) for k in keys]
             await asyncio.gather(*tasks)
-            logger.info("Force Pull complete.")
 
 key_manager = KeyManager()
 
-# --- BACKGROUND TASK ---
+# --- BACKGROUND TASKS ---
 async def polling_worker():
     while True:
-        logger.info("Background: Refreshing all keys...")
         keys = await db.get_keys()
         for k in keys:
-            await key_manager.check_balance(k['key'])
-        
+            await key_manager.check_balance(k)
         interval = await db.get_polling_interval()
         await asyncio.sleep(interval)
+
+async def log_cleanup_worker():
+    while True:
+        await asyncio.sleep(5 * 3600)
+        system_logs.clear()
+        add_log("System logs automatically cleared (5h rotation).")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db._init_db()
     worker = asyncio.create_task(polling_worker())
+    cleanup = asyncio.create_task(log_cleanup_worker())
     yield
     worker.cancel()
-    await key_manager.client.aclose()
-    await proxy_client.aclose()
+    cleanup.cancel()
+    await proxy_manager.close_all()
 
 app = FastAPI(lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
@@ -235,17 +308,14 @@ security = HTTPBearer()
 # --- AUTH DEPENDENCY ---
 def verify_admin_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if credentials.credentials != SESSION_TOKEN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid session")
+        raise HTTPException(status_code=403, detail="Invalid session")
     return True
 
-# --- ADMIN API ---
-class AuthRequest(BaseModel):
-    pin: str
-
+# --- API ROUTES ---
 @app.post("/admin/auth")
-async def admin_auth(req: AuthRequest):
+async def admin_auth(req: Dict):
     stored_hash = await db.get_admin_password_hash()
-    if bcrypt.checkpw(req.pin.encode(), stored_hash.encode()):
+    if bcrypt.checkpw(req.get('pin','').encode(), stored_hash.encode()):
         return {"token": SESSION_TOKEN}
     raise HTTPException(status_code=401, detail="Invalid Password")
 
@@ -257,14 +327,12 @@ async def dashboard(request: Request):
 async def list_keys():
     return {"keys": await db.get_keys()}
 
-class KeyAddRequest(BaseModel):
-    key: str
-    priority: int = 0
-
 @app.post("/admin/keys", dependencies=[Depends(verify_admin_token)])
-async def add_key(req: KeyAddRequest):
-    await db.add_key(req.key, req.priority)
-    await key_manager.check_balance(req.key)
+async def add_key(req: Dict):
+    await db.add_key(req['key'], req.get('priority', 0))
+    keys = await db.get_keys()
+    new_key_data = next((k for k in keys if k['key'] == req['key']), None)
+    if new_key_data: await key_manager.check_balance(new_key_data)
     return {"success": True}
 
 @app.delete("/admin/keys/{key}", dependencies=[Depends(verify_admin_token)])
@@ -274,20 +342,51 @@ async def delete_key(key: str):
 
 @app.get("/admin/test/{key}", dependencies=[Depends(verify_admin_token)])
 async def test_key(key: str):
-    balance = await key_manager.check_balance(key)
-    return {"success": balance >= 0, "balance": balance}
+    keys = await db.get_keys()
+    target_key = next((k for k in keys if k['key'] == key), None)
+    if not target_key: return {"success": False, "error": "Key not found"}
+    balance, proxy_info = await key_manager.check_balance(target_key)
+    return {"success": balance >= 0, "balance": balance, "ip": proxy_info}
 
-# --- CLIENT KEYS API ---
+@app.post("/admin/keys/proxy", dependencies=[Depends(verify_admin_token)])
+async def update_key_proxy(req: Dict):
+    await db.update_key_proxy(req['key'], req['proxy_id'])
+    return {"success": True}
+
+@app.get("/admin/proxies", dependencies=[Depends(verify_admin_token)])
+async def list_proxies():
+    return {"proxies": await db.get_proxies()}
+
+@app.post("/admin/proxies", dependencies=[Depends(verify_admin_token)])
+async def add_proxy(req: Dict):
+    await db.add_proxy(req['ip'], req['port'], req.get('username'), req.get('password'))
+    return {"success": True}
+
+@app.delete("/admin/proxies/{proxy_id}", dependencies=[Depends(verify_admin_token)])
+async def delete_proxy(proxy_id: int):
+    await db.delete_proxy(proxy_id)
+    return {"success": True}
+
+@app.get("/admin/proxies/test/{proxy_id}", dependencies=[Depends(verify_admin_token)])
+async def test_proxy_outbound(proxy_id: int):
+    proxy = await db.get_proxy_by_id(proxy_id)
+    if not proxy: return {"success": False, "error": "Proxy not found"}
+    try:
+        client = await proxy_manager.get_client_for_proxy(proxy)
+        resp = await client.get("https://api.ipify.org?format=json", timeout=10.0)
+        if resp.status_code == 200:
+            detected_ip = resp.json().get("ip")
+            return {"success": True, "detected_ip": detected_ip, "matches": detected_ip == proxy['ip']}
+        return {"success": False, "error": f"HTTP {resp.status_code}"}
+    except Exception as e: return {"success": False, "error": str(e)}
+
 @app.get("/admin/client-keys", dependencies=[Depends(verify_admin_token)])
 async def list_client_keys():
     return {"keys": await db.get_client_keys()}
 
-class ClientKeyAddRequest(BaseModel):
-    name: str
-
 @app.post("/admin/client-keys", dependencies=[Depends(verify_admin_token)])
-async def add_client_key(req: ClientKeyAddRequest):
-    new_key = await db.generate_client_key(req.name)
+async def add_client_key(req: Dict):
+    new_key = await db.generate_client_key(req['name'])
     return {"success": True, "key": new_key}
 
 @app.delete("/admin/client-keys/{key}", dependencies=[Depends(verify_admin_token)])
@@ -295,53 +394,36 @@ async def delete_client_key(key: str):
     await db.revoke_client_key(key)
     return {"success": True}
 
-# --- SETTINGS API ---
-class PasswordChangeRequest(BaseModel):
-    new_password: str
+@app.get("/admin/settings/polling", dependencies=[Depends(verify_admin_token)])
+async def get_polling():
+    return {"interval": await db.get_polling_interval()}
 
-@app.post("/admin/password", dependencies=[Depends(verify_admin_token)])
-async def change_password(req: PasswordChangeRequest):
-    await db.set_admin_password(req.new_password)
+@app.post("/admin/settings/polling", dependencies=[Depends(verify_admin_token)])
+async def update_polling(req: Dict):
+    await db.set_polling_interval(req['interval'])
     return {"success": True}
 
-# --- ANALYTICS API ---
+@app.get("/admin/live_status", dependencies=[Depends(verify_admin_token)])
+async def live_status():
+    return {"logs": list(system_logs)}
+
 @app.get("/admin/analytics", dependencies=[Depends(verify_admin_token)])
 async def get_analytics():
     ist = timezone(timedelta(hours=5, minutes=30))
     now = datetime.now(ist)
-    
     async def get_count(start_time: str):
         async with aiosqlite.connect(DB_PATH) as conn:
             async with conn.execute("SELECT COUNT(*) FROM usage_stats WHERE timestamp >= ?", (start_time,)) as cursor:
                 row = await cursor.fetchone()
                 return row[0] if row else 0
-
     today = (now - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
     this_week = (now - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
     this_month = (now - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
     this_year = (now - timedelta(days=365)).strftime("%Y-%m-%d %H:%M:%S")
+    return {"today": await get_count(today), "this_week": await get_count(this_week), "this_month": await get_count(this_month), "this_year": await get_count(this_year)}
 
-    return {
-        "today": await get_count(today),
-        "this_week": await get_count(this_week),
-        "this_month": await get_count(this_month),
-        "this_year": await get_count(this_year)
-    }
-
-# --- SYSTEM LOGS API ---
-@app.get("/admin/live_status", dependencies=[Depends(verify_admin_token)])
-async def live_status():
-    return {"logs": list(system_logs)}
-
-
-# --- THE SMART DIRECT PROXY ---
-proxy_client = httpx.AsyncClient(timeout=900.0, follow_redirects=True)
-
-# ---------------------------------------------------------
-# ANTHROPIC TO OPENAI TRANSLATORS (Standalone)
-# ---------------------------------------------------------
+# --- PROXY CORE ---
 def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
-    """Translates Anthropic JSON payload to OpenAI JSON payload, including Tools & Vision"""
     model = anthropic_json.get("model", "openai")
     openai_json = {
         "model": model,
@@ -350,20 +432,15 @@ def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
         "messages": []
     }
     
-    # 1. System Prompt (CLEANED — strip x-anthropic-billing-header and SDK junk)
     if "system" in anthropic_json and anthropic_json["system"]:
         sys_content = anthropic_json["system"]
         if isinstance(sys_content, list):
             sys_content = "".join([block.get("text", "") for block in sys_content if block.get("type") == "text"])
-        # Strip x-anthropic-billing-header and all Claude SDK internals — these leak into system prompt as plain text
-        # Pattern: "x-anthropic-billing-header: key=val; key=val; actual system prompt"
-        # The SDK sends semi-colon-separated key=value pairs followed immediately by the real system text
         sys_content = re.sub(r'^x-anthropic-billing-header:\s*(?:[a-z_]+=[^\s;]+;\s*)*', '', sys_content)
         sys_content = sys_content.strip()
         if sys_content:
             openai_json["messages"].append({"role": "system", "content": sys_content})
         
-    # 2. Tools Translation
     if "tools" in anthropic_json:
         openai_json["tools"] = []
         for tool in anthropic_json["tools"]:
@@ -378,24 +455,15 @@ def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
             
     if "tool_choice" in anthropic_json:
         choice = anthropic_json["tool_choice"]
-        if choice.get("type") == "auto":
-            openai_json["tool_choice"] = "auto"
-        elif choice.get("type") == "any":
-            openai_json["tool_choice"] = "required"
-        elif choice.get("type") == "tool":
-            openai_json["tool_choice"] = {"type": "function", "function": {"name": choice.get("name")}}
+        if choice.get("type") == "auto": openai_json["tool_choice"] = "auto"
+        elif choice.get("type") == "any": openai_json["tool_choice"] = "required"
+        elif choice.get("type") == "tool": openai_json["tool_choice"] = {"type": "function", "function": {"name": choice.get("name")}}
 
-    # 3. Messages Translation (Text, Images, Tool Use, Tool Results)
     raw_messages = []
-
     for msg in anthropic_json.get("messages", []):
         role = msg.get("role", "user")
         content = msg.get("content", "")
-
-        # Skip system messages in the conversation history — only top-level "system" field
-        # should produce a system message. Upstream rejects system messages anywhere else.
-        if role == "system":
-            continue
+        if role == "system": continue
 
         if isinstance(content, str):
             raw_messages.append({"role": role, "content": content})
@@ -403,458 +471,216 @@ def translate_anthropic_req_to_openai(anthropic_json: dict) -> dict:
             openai_content = []
             tool_calls = []
             tool_results = []
-
             for block in content:
                 block_type = block.get("type")
                 if block_type == "text":
                     openai_content.append({"type": "text", "text": block.get("text", "")})
                 elif block_type == "image":
                     source = block.get("source", {})
-                    source_type = source.get("type")
-                    if source_type == "base64":
-                        data = source.get("data")
-                        media_type = source.get("media_type", "image/jpeg")
+                    if source.get("type") == "base64":
                         openai_content.append({
                             "type": "image_url",
-                            "image_url": {"url": f"data:{media_type};base64,{data}"}
-                        })
-                    elif source_type == "url":
-                        # Claude Code sometimes sends images as URLs
-                        openai_content.append({
-                            "type": "image_url",
-                            "image_url": {"url": source.get("url", "")}
+                            "image_url": {"url": f"data:{source.get('media_type', 'image/jpeg')};base64,{source.get('data')}"}
                         })
                 elif block_type == "tool_use":
                     tool_calls.append({
                         "id": block.get("id"),
                         "type": "function",
-                        "function": {
-                            "name": block.get("name"),
-                            "arguments": json.dumps(block.get("input", {}))
-                        }
+                        "function": {"name": block.get("name"), "arguments": json.dumps(block.get("input", {}))}
                     })
                 elif block_type == "tool_result":
-                    # Anthropic tool_result -> OpenAI tool message
                     res_content = block.get("content", "")
                     if isinstance(res_content, list):
                         res_content = "".join([c.get("text", "") for c in res_content if c.get("type") == "text"])
-                    if block.get("is_error"):
-                        res_content = f"Error: {res_content}"
                     tool_results.append({
                         "role": "tool",
                         "tool_call_id": block.get("tool_use_id"),
                         "content": str(res_content)
                     })
 
-            # Crucial: OpenAI requires strict order. Tool results must be appended FIRST if they are in the same block as user text.
-            for tr in tool_results:
-                raw_messages.append(tr)
-
+            for tr in tool_results: raw_messages.append(tr)
             if tool_calls:
-                # If there are tool calls, it's an assistant message
-                # FIX: Preserve image content alongside tool_calls (images were being dropped here)
                 openai_msg = {"role": "assistant"}
                 if openai_content:
-                    has_image = any(c.get("type") == "image_url" for c in openai_content)
-                    if has_image:
-                        # Keep the full content array with images — OpenAI supports image_url + text
-                        # But OpenAI also needs tool_calls. We include both text and images.
-                        text_content = "".join([c.get("text", "") for c in openai_content if c.get("type") == "text"])
-                        image_items = [c for c in openai_content if c.get("type") == "image_url"]
-                        # Build content as array: text + images
-                        content_parts = [{"type": "text", "text": text_content}] + image_items
-                        openai_msg["content"] = content_parts
-                    else:
-                        openai_msg["content"] = "".join([c.get("text", "") for c in openai_content if c.get("type") == "text"])
-                else:
-                    openai_msg["content"] = "" # OpenAI requires content even if empty when sending tool calls
+                    text_content = "".join([c.get("text", "") for c in openai_content if c.get("type") == "text"])
+                    image_items = [c for c in openai_content if c.get("type") == "image_url"]
+                    openai_msg["content"] = [{"type": "text", "text": text_content}] + image_items if image_items else text_content
+                else: openai_msg["content"] = ""
                 openai_msg["tool_calls"] = tool_calls
                 raw_messages.append(openai_msg)
             elif openai_content:
-                # Normal user/assistant message with text/image
                 has_image = any(c.get("type") == "image_url" for c in openai_content)
                 if not has_image:
-                    # Flatten to string to prevent 400 errors on text models
                     content_str = "".join([c.get("text", "") for c in openai_content if c.get("type") == "text"])
-                    if content_str:
-                        raw_messages.append({"role": role, "content": content_str})
-                else:
-                    raw_messages.append({"role": role, "content": openai_content})
+                    raw_messages.append({"role": role, "content": content_str})
+                else: raw_messages.append({"role": role, "content": openai_content})
 
     openai_json["messages"] = raw_messages
-
     return openai_json
 
 def translate_openai_resp_to_anthropic(openai_json: dict) -> dict:
-    """Translates OpenAI ChatCompletion response to Anthropic Message response"""
     content_blocks = []
     stop_reason = "end_turn"
-    
     if "choices" in openai_json and len(openai_json["choices"]) > 0:
         choice = openai_json["choices"][0]
         msg = choice.get("message", {})
-        
-        # 1. Handle Text Content
-        if msg.get("content"):
-            content_blocks.append({"type": "text", "text": msg.get("content")})
-            
-        # 2. Handle Tool Calls
+        if msg.get("content"): content_blocks.append({"type": "text", "text": msg.get("content")})
         if msg.get("tool_calls"):
             stop_reason = "tool_use"
             for tcall in msg.get("tool_calls", []):
-                try:
-                    args = json.loads(tcall.get("function", {}).get("arguments", "{}"))
-                except:
-                    args = {}
-                content_blocks.append({
-                    "type": "tool_use",
-                    "id": tcall.get("id"),
-                    "name": tcall.get("function", {}).get("name"),
-                    "input": args
-                })
-                
-        # 3. Handle Finish Reason mapping
+                try: args = json.loads(tcall.get("function", {}).get("arguments", "{}"))
+                except: args = {}
+                content_blocks.append({"type": "tool_use", "id": tcall.get("id"), "name": tcall.get("function", {}).get("name"), "input": args})
         oai_finish = choice.get("finish_reason")
-        if oai_finish == "tool_calls":
-            stop_reason = "tool_use"
-        elif oai_finish == "length":
-            stop_reason = "max_tokens"
-        elif oai_finish == "stop":
-            stop_reason = "end_turn"
-        
+        if oai_finish == "tool_calls": stop_reason = "tool_use"
+        elif oai_finish == "length": stop_reason = "max_tokens"
+    
     return {
         "id": openai_json.get("id", "msg_" + secrets.token_hex(8)),
-        "type": "message",
-        "role": "assistant",
-        "model": openai_json.get("model", "openai"),
-        "content": content_blocks,
-        "stop_reason": stop_reason,
-        "stop_sequence": None,
+        "type": "message", "role": "assistant", "model": openai_json.get("model", "openai"),
+        "content": content_blocks, "stop_reason": stop_reason, "stop_sequence": None,
         "usage": {"input_tokens": 0, "output_tokens": 0}
     }
 
 async def stream_openai_to_anthropic(upstream_resp, original_model):
-    """Translates OpenAI SSE to Anthropic SSE for Claude SDK stability, including Tool Calls"""
-    try:
-        # yield message_start
-        msg_id = "msg_" + secrets.token_hex(8)
-        start_msg = {
-            "type": "message_start", 
-            "message": {
-                "id": msg_id, 
-                "type": "message", 
-                "role": "assistant", 
-                "content": [], 
-                "model": original_model, 
-                "stop_reason": None, 
-                "stop_sequence": None, 
-                "usage": {"input_tokens": 0, "output_tokens": 0}
-            }
-        }
-        yield f'event: message_start\ndata: {json.dumps(start_msg)}\n\n'.encode("utf-8")
-        
-        current_block_index = 0
-        in_text_block = False
-        in_tool_block = False
-        current_tool_call_id = ""
-        current_tool_name = ""
-        current_tool_args = ""
-        
-        async for line in upstream_resp.aiter_lines():
-            line = line.strip()
-            if not line or not line.startswith("data: "):
-                continue
-            data_str = line[6:]
-            if data_str == "[DONE]":
-                break
-            try:
-                data_json = json.loads(data_str)
-                choices = data_json.get("choices", [])
-                if choices:
-                    delta = choices[0].get("delta", {})
-                    
-                    # A. Text Content Streaming
-                    if "content" in delta and delta["content"]: # Only process if content is not empty
-                        if in_tool_block:
-                            # Close tool block before starting text
-                            block_stop = {"type": "content_block_stop", "index": current_block_index}
-                            yield f'event: content_block_stop\ndata: {json.dumps(block_stop)}\n\n'.encode("utf-8")
-                            in_tool_block = False
-                            current_block_index += 1
-                            
-                        if not in_text_block:
-                            block_start = {"type": "content_block_start", "index": current_block_index, "content_block": {"type": "text", "text": ""}}
-                            yield f'event: content_block_start\ndata: {json.dumps(block_start)}\n\n'.encode("utf-8")
-                            in_text_block = True
-                            
-                        anthropic_delta = {
-                            "type": "content_block_delta",
-                            "index": current_block_index,
-                            "delta": {"type": "text_delta", "text": delta["content"]}
-                        }
-                        yield f'event: content_block_delta\ndata: {json.dumps(anthropic_delta)}\n\n'.encode("utf-8")
-                        
-                    # B. Tool Calls Streaming
-                    if "tool_calls" in delta:
-                        # If we were streaming text, close that block first
-                        if in_text_block:
-                            block_stop = {"type": "content_block_stop", "index": current_block_index}
-                            yield f'event: content_block_stop\ndata: {json.dumps(block_stop)}\n\n'.encode("utf-8")
-                            in_text_block = False
-                            current_block_index += 1
-                            
-                        tcall = delta["tool_calls"][0] # Usually streams one at a time
-                        
-                        # New Tool Call Block Start
-                        if "id" in tcall and tcall["id"]:
-                            # If we were already in a tool block, close the previous one
-                            if in_tool_block:
-                                block_stop = {"type": "content_block_stop", "index": current_block_index}
-                                yield f'event: content_block_stop\ndata: {json.dumps(block_stop)}\n\n'.encode("utf-8")
-                                current_block_index += 1
-                                
-                            current_tool_call_id = tcall["id"]
-                            current_tool_name = tcall.get("function", {}).get("name", "")
-                            block_start = {
-                                "type": "content_block_start", 
-                                "index": current_block_index, 
-                                "content_block": {
-                                    "type": "tool_use", 
-                                    "id": current_tool_call_id,
-                                    "name": current_tool_name,
-                                    "input": {} # We stream args later
-                                }
-                            }
-                            yield f'event: content_block_start\ndata: {json.dumps(block_start)}\n\n'.encode("utf-8")
-                            in_tool_block = True
-                            
-                        # Tool Arguments Delta
-                        if "function" in tcall and "arguments" in tcall["function"]:
-                            anthropic_delta = {
-                                "type": "content_block_delta",
-                                "index": current_block_index,
-                                "delta": {"type": "input_json_delta", "partial_json": tcall["function"]["arguments"]}
-                            }
-                            yield f'event: content_block_delta\ndata: {json.dumps(anthropic_delta)}\n\n'.encode("utf-8")
-                            
-                    # C. Stop Reason Mapping
-                    finish_reason = choices[0].get("finish_reason")
-                    if finish_reason:
-                        # Close any open blocks
-                        if in_text_block or in_tool_block:
-                            block_stop = {"type": "content_block_stop", "index": current_block_index}
-                            yield f'event: content_block_stop\ndata: {json.dumps(block_stop)}\n\n'.encode("utf-8")
-                            
-                        stop_mapping = {
-                            "stop": "end_turn",
-                            "tool_calls": "tool_use",
-                            "length": "max_tokens"
-                        }
-                        anthropic_stop = stop_mapping.get(finish_reason, "end_turn")
-                        
-                        msg_delta = {"type": "message_delta", "delta": {"stop_reason": anthropic_stop, "stop_sequence": None}, "usage": {"output_tokens": 10}}
-                        yield f'event: message_delta\ndata: {json.dumps(msg_delta)}\n\n'.encode("utf-8")
-
-            except json.JSONDecodeError:
-                continue
-                
-        yield b'event: message_stop\ndata: {"type": "message_stop"}\n\n'
-    finally:
-        await upstream_resp.aclose()
-
-
-async def stream_openai_passthrough(upstream_resp):
-    """Clean byte-level passthrough to avoid UTF-8 decoding errors in Hermes"""
-    try:
-        async for chunk in upstream_resp.aiter_bytes():
-            yield chunk
-    finally:
-        await upstream_resp.aclose()
-
-
-# ---------------------------------------------------------
-# CORE PROXY HANDLER (DIRECT PASS-THRU TO POLLINATIONS)
-# ---------------------------------------------------------
-async def core_proxy(request: Request, is_anthropic: bool = False):
-    # 1. Mandatory Client Authentication
-    client_key = None
-    auth_header = request.headers.get("Authorization")
-    x_api_key = request.headers.get("x-api-key")
+    msg_id = "msg_" + secrets.token_hex(8)
+    yield f'event: message_start\ndata: {json.dumps({"type": "message_start", "message": {"id": msg_id, "type": "message", "role": "assistant", "content": [], "model": original_model, "stop_reason": None, "stop_sequence": None, "usage": {"input_tokens": 0, "output_tokens": 0}}})}\n\n'.encode("utf-8")
     
-    if auth_header and auth_header.startswith("Bearer "):
-        client_key = auth_header.split(" ")[1]
-    elif x_api_key:
-        client_key = x_api_key
-        
-    if not client_key:
-        return JSONResponse({"error": {"message": "Missing Authorization or x-api-key header"}}, status_code=401)
+    current_block_index = 0
+    in_text_block = False
+    in_tool_block = False
     
-    if not await db.validate_client_key(client_key):
-        return JSONResponse({"error": {"message": "Invalid client API key"}}, status_code=401)
-
-    # 2. Header Preparation
-    clean_headers = {
-        "User-Agent": "curl/8.5.0",
-        "Accept": "*/*",
-        "Content-Type": "application/json"
-    }
-    
-    # 3. Payload Preparation
-    raw_body = await request.body()
-    try:
-        body_json = json.loads(raw_body) if raw_body else {}
-    except Exception as e:
-        logger.error(f"Body parsing failed: {e}")
-        return JSONResponse({"error": {"message": "Invalid JSON"}}, status_code=400)
-        
-    is_stream = body_json.get("stream", False)
-    original_model = body_json.get("model", "openai")
-    
-    # 4. Translation Layer (Anthropic -> OpenAI)
-    if is_anthropic:
-        with open("/tmp/debug_proxy.log", "a") as f:
-            f.write(f"\n--- RAW ANTHROPIC REQ ---\n{json.dumps(body_json, indent=2)}\n")
+    async for line in upstream_resp.aiter_lines():
+        if not line.startswith("data: "): continue
+        data_str = line[6:]
+        if data_str == "[DONE]": break
+        try:
+            data_json = json.loads(data_str)
+            choices = data_json.get("choices", [])
+            if not choices: continue
+            delta = choices[0].get("delta", {})
             
-        body_json = translate_anthropic_req_to_openai(body_json)
-        raw_body = json.dumps(body_json).encode("utf-8")
-        
-        with open("/tmp/debug_proxy.log", "a") as f:
-            f.write(f"\n--- TRANSLATED OPENAI REQ ---\n{json.dumps(body_json, indent=2)}\n")
+            if "content" in delta and delta["content"]:
+                if in_tool_block:
+                    yield f'event: content_block_stop\ndata: {json.dumps({"type": "content_block_stop", "index": current_block_index})}\n\n'.encode("utf-8")
+                    in_tool_block = False; current_block_index += 1
+                if not in_text_block:
+                    yield f'event: content_block_start\ndata: {json.dumps({"type": "content_block_start", "index": current_block_index, "content_block": {"type": "text", "text": ""}})}\n\n'.encode("utf-8")
+                    in_text_block = True
+                yield f'event: content_block_delta\ndata: {json.dumps({"type": "content_block_delta", "index": current_block_index, "delta": {"type": "text_delta", "text": delta["content"]}})}\n\n'.encode("utf-8")
+                
+            if "tool_calls" in delta:
+                if in_text_block:
+                    yield f'event: content_block_stop\ndata: {json.dumps({"type": "content_block_stop", "index": current_block_index})}\n\n'.encode("utf-8")
+                    in_text_block = False; current_block_index += 1
+                tcall = delta["tool_calls"][0]
+                if "id" in tcall and tcall["id"]:
+                    if in_tool_block:
+                        yield f'event: content_block_stop\ndata: {json.dumps({"type": "content_block_stop", "index": current_block_index})}\n\n'.encode("utf-8")
+                        current_block_index += 1
+                    yield f'event: content_block_start\ndata: {json.dumps({"type": "content_block_start", "index": current_block_index, "content_block": {"type": "tool_use", "id": tcall["id"], "name": tcall.get("function", {}).get("name", ""), "input": {}}})}\n\n'.encode("utf-8")
+                    in_tool_block = True
+                if "function" in tcall and "arguments" in tcall["function"]:
+                    yield f'event: content_block_delta\ndata: {json.dumps({"type": "content_block_delta", "index": current_block_index, "delta": {"type": "input_json_delta", "partial_json": tcall["function"]["arguments"]}})}\n\n'.encode("utf-8")
+                    
+            finish_reason = choices[0].get("finish_reason")
+            if finish_reason:
+                if in_text_block or in_tool_block:
+                    yield f'event: content_block_stop\ndata: {json.dumps({"type": "content_block_stop", "index": current_block_index})}\n\n'.encode("utf-8")
+                stop_mapping = {"stop": "end_turn", "tool_calls": "tool_use", "length": "max_tokens"}
+                yield f'event: message_delta\ndata: {json.dumps({"type": "message_delta", "delta": {"stop_reason": stop_mapping.get(finish_reason, "end_turn"), "stop_sequence": None}, "usage": {"output_tokens": 1}})}\n\n'.encode("utf-8")
+        except: continue
+    yield f'event: message_stop\ndata: {json.dumps({"type": "message_stop"})}\n\n'.encode("utf-8")
 
-    # DIRECT UPSTREAM TARGET
-    url = f"{BASE_URL}/v1/chat/completions"
-
-    # 5. FAILOVER & WAIT LOOP LOGIC
-    global last_wait_log_time
-    while True:
-        selected_key_data = await key_manager.get_best_key()
-        
-        if not selected_key_data:
-            current_time = asyncio.get_event_loop().time()
-            if current_time - last_wait_log_time > 150.0:
-                add_log("No active keys (>0.05). Holding connection...")
-                last_wait_log_time = current_time
-            await asyncio.sleep(150) # 150s Wait Loop
-            await key_manager.force_pull_balances()
-            continue
-        
-        current_active_key = selected_key_data['key']
-        # FIX: CRITICAL AUTH OVERWRITE
-        clean_headers["Authorization"] = f"Bearer {current_active_key}"
+@app.api_route("/v1/chat/completions", methods=["POST"])
+@app.api_route("/v1/v1/chat/completions", methods=["POST"])
+@app.api_route("/v1/messages", methods=["POST"])
+@app.api_route("/v1/v1/messages", methods=["POST"])
+async def core_proxy(request: Request):
+    client_key = request.headers.get("Authorization", "").replace("Bearer ", "") or request.headers.get("x-api-key", "")
+    if not client_key or not await db.validate_client_key(client_key):
+        return JSONResponse({"error": "Invalid Key"}, status_code=401)
+    
+    is_anthropic = "messages" in request.url.path
+    raw_body = await request.body()
+    try: body_json = json.loads(raw_body) if raw_body else {}
+    except: return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    
+    orig_model = body_json.get("model", "openai")
+    is_stream = body_json.get("stream", False)
+    if is_anthropic: body_json = translate_anthropic_req_to_openai(body_json)
+    
+    attempts = 0
+    while attempts < 10:
+        attempts += 1
+        key_data = await key_manager.get_best_key()
+        if not key_data:
+            await asyncio.sleep(2); await key_manager.force_pull_balances(); continue
         
         try:
-            proxy_req = proxy_client.build_request(
-                method="POST",
-                url=url,
-                headers=clean_headers,
-                content=raw_body,
-                params=request.query_params
-            )
+            proxy_client = proxy_manager.default_client
+            proxy_info = "VPS IP (Direct)"
+            if key_data.get('proxy_id'):
+                proxy = await db.get_proxy_by_id(key_data['proxy_id'])
+                if proxy: proxy_client = await proxy_manager.get_client_for_proxy(proxy); proxy_info = proxy['ip']
             
-            upstream_resp = await proxy_client.send(proxy_req, stream=is_stream)
-            await db.log_usage("/v1/chat/completions", upstream_resp.status_code)
+            headers = {"Authorization": f"Bearer {key_data['key']}", "Content-Type": "application/json", "User-Agent": "curl/8.5.0"}
             
-            # Ban protection / Shifting
-            if upstream_resp.status_code in (401, 402, 403):
-                add_log(f"Key {current_active_key[:10]} depleted (HTTP {upstream_resp.status_code}). Zeroing balance and shifting...")
-                await upstream_resp.aread()
-                await upstream_resp.aclose()
-                await db.update_balance(current_active_key, 0.0)
-                continue
-
-            resp_headers = {"Content-Type": upstream_resp.headers.get("content-type", "application/json")}
-            
-            # 6. Response Handlers
-            if is_stream and upstream_resp.status_code == 200:
-                if is_anthropic:
-                    # Translate OpenAI SSE to Anthropic SSE
-                    return StreamingResponse(
-                        stream_openai_to_anthropic(upstream_resp, original_model),
-                        status_code=upstream_resp.status_code,
-                        headers=resp_headers,
-                        media_type="text/event-stream"
-                    )
-                else:
-                    # Pure Byte Passthrough for Hermes stability
-                    return StreamingResponse(
-                        stream_openai_passthrough(upstream_resp),
-                        status_code=upstream_resp.status_code,
-                        headers=resp_headers,
-                        media_type="text/event-stream"
-                    )
+            if not is_stream:
+                resp = await proxy_client.post(f"{BASE_URL}/v1/chat/completions", headers=headers, json=body_json, timeout=90.0)
+                await db.log_usage(request.url.path, resp.status_code)
+                add_log(f"Req: {key_data['key'][:8]} via {proxy_info} -> {resp.status_code}")
+                
+                if resp.status_code in (401, 403):
+                    await db.update_balance(key_data['key'], 0.0); continue
+                
+                if is_anthropic and resp.status_code == 200:
+                    return JSONResponse(translate_openai_resp_to_anthropic(resp.json()))
+                return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
             else:
-                # Synchronous Response or Error Response
-                content_bytes = await upstream_resp.aread()
-                await upstream_resp.aclose()
+                # Optimized Streaming: Check status before yielding
+                resp_stream = await proxy_client.stream("POST", f"{BASE_URL}/v1/chat/completions", headers=headers, json=body_json, timeout=90.0)
+                await resp_stream.__aenter__()
+                
+                if resp_stream.status_code in (401, 403):
+                    await resp_stream.__aexit__(None, None, None)
+                    await db.update_balance(key_data['key'], 0.0); continue
+                
+                if resp_stream.status_code != 200:
+                    content = await resp_stream.aread()
+                    await resp_stream.__aexit__(None, None, None)
+                    return Response(content=content, status_code=resp_stream.status_code)
 
-                if is_anthropic:
-                    # For 400/5xx errors, pass through the raw upstream error without translation
-                    if upstream_resp.status_code >= 400:
-                        logger.error(f"Upstream returned HTTP {upstream_resp.status_code}: {content_bytes[:500]}")
-                        return Response(
-                            content=content_bytes,
-                            status_code=upstream_resp.status_code,
-                            headers=resp_headers,
-                            media_type=resp_headers["Content-Type"]
-                        )
+                async def stream_generator():
                     try:
-                        openai_resp_json = json.loads(content_bytes)
-                        anthropic_resp_json = translate_openai_resp_to_anthropic(openai_resp_json)
-                        return JSONResponse(anthropic_resp_json, status_code=upstream_resp.status_code, headers=resp_headers)
-                    except json.JSONDecodeError:
-                        return Response(content=content_bytes, status_code=upstream_resp.status_code, headers=resp_headers)
-                else:
-                    return Response(
-                        content=content_bytes,
-                        status_code=upstream_resp.status_code,
-                        headers=resp_headers,
-                        media_type=resp_headers["Content-Type"]
-                    )
+                        if is_anthropic:
+                            async for chunk in stream_openai_to_anthropic(resp_stream, orig_model): yield chunk
+                        else:
+                            async for line in resp_stream.aiter_lines():
+                                if line: yield (line + "\n").encode("utf-8")
+                    except Exception as e:
+                        add_log(f"Stream Error: {e}")
+                        yield f'data: {{"error": "{str(e)}"}}\n\n'.encode("utf-8")
+                    finally:
+                        await resp_stream.__aexit__(None, None, None)
 
+                return StreamingResponse(stream_generator(), media_type="text/event-stream")
+                
+        except HTTPException as e:
+            if e.status_code in (401, 403): continue
+            return JSONResponse({"error": str(e)}, status_code=e.status_code)
         except Exception as e:
-            logger.error(f"Proxy attempt failed: {e}")
-            await asyncio.sleep(2)
-            continue
+            add_log(f"Error: {e}")
+            if attempts >= 10: return JSONResponse({"error": str(e)}, status_code=500)
+            await asyncio.sleep(1); continue
 
-# --- EXPLICIT ROUTES ---
-
-@app.post("/v1/messages")
-@app.post("/v1/v1/messages")
-async def anthropic_proxy(request: Request):
-    """Route for Anthropic SDK / Claude Code"""
-    return await core_proxy(request, is_anthropic=True)
-
-@app.post("/v1/chat/completions")
-@app.post("/v1/v1/chat/completions")
-async def openai_proxy(request: Request):
-    """Route for OpenAI SDK / Hermes Agent"""
-    return await core_proxy(request, is_anthropic=False)
+    return JSONResponse({"error": "All keys exhausted or max retries reached"}, status_code=503)
 
 @app.api_route("/v1", methods=["GET", "HEAD"])
-@app.api_route("/v1/v1", methods=["GET", "HEAD"])
-async def v1_status():
-    return JSONResponse({"status": "running", "version": "1.0"})
+async def v1_status(): return JSONResponse({"status": "running"})
 
 @app.get("/v1/models")
-@app.get("/v1/v1/models")
-async def list_models_proxy():
-    """Route for Model Discovery (Anthropic Compatible)"""
+async def list_models():
     async with httpx.AsyncClient() as client:
         resp = await client.get(f"{BASE_URL}/v1/models")
-        if resp.status_code == 200:
-            try:
-                openai_models = resp.json().get("data", [])
-                anthropic_models = {
-                    "data": [
-                        {
-                            "type": "model",
-                            "id": m.get("id"),
-                            "display_name": m.get("id"),
-                            "created_at": "2024-02-29T00:00:00Z"
-                        } for m in openai_models
-                    ]
-                }
-                return JSONResponse(anthropic_models)
-            except Exception as e:
-                pass
         return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
