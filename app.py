@@ -717,7 +717,8 @@ async def core_proxy(request: Request):
             if e.status_code in (401, 403): continue
             return JSONResponse({"error": str(e)}, status_code=e.status_code)
         except Exception as e:
-            add_log(f"Proxy attempt failed: {e}")
+            error_details = str(e) if str(e) else repr(e)
+            add_log(f"Proxy attempt failed: {type(e).__name__} - {error_details}")
             await asyncio.sleep(2); continue
 
     return JSONResponse({"error": "All keys exhausted or max hold duration reached"}, status_code=503)
