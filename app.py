@@ -655,7 +655,11 @@ async def core_proxy(request: Request):
     if is_anthropic: 
         body_json = translate_anthropic_req_to_openai(body_json)
         raw_body = json.dumps(body_json).encode("utf-8")
-    
+    else:
+        # Debug: Dump OpenAI SDK payload for vision issues
+        with open("/tmp/debug_openai_req.log", "a") as f:
+            f.write(f"\n--- INCOMING OPENAI REQ ---\n{json.dumps(body_json, indent=2)}\n")
+            
     max_hold = await db.get_max_hold_duration()
     start_time = asyncio.get_event_loop().time()
     
@@ -681,9 +685,10 @@ async def core_proxy(request: Request):
                 if resp.status_code in (401, 402, 403):
                     await db.update_balance(key_data['key'], 0.0); continue
                 
+                safe_headers = {"Content-Type": resp.headers.get("content-type", "application/json")}
                 if is_anthropic and resp.status_code == 200:
-                    return JSONResponse(translate_openai_resp_to_anthropic(resp.json()))
-                return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
+                    return JSONResponse(translate_openai_resp_to_anthropic(resp.json()), headers=safe_headers)
+                return Response(content=resp.content, status_code=resp.status_code, headers=safe_headers)
             else:
                 # Optimized Streaming: Check status before yielding
                 resp_ctx = proxy_client.stream("POST", f"{BASE_URL}/v1/chat/completions", headers=headers, content=raw_body, timeout=90.0)
