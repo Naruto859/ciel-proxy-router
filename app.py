@@ -682,7 +682,7 @@ async def core_proxy(request: Request):
                 await db.log_usage(request.url.path, resp.status_code)
                 add_log(f"Req: {key_data['key'][:8]} via {proxy_info} -> {resp.status_code}")
                 
-                if resp.status_code in (401, 402, 403, 429):
+                if resp.status_code in (401, 402, 403, 429, 500, 502, 503, 504):
                     add_log(f"Key {key_data['key'][:8]} failed with {resp.status_code}. Draining and shifting to NEXT key...")
                     await db.update_balance(key_data['key'], 0.0); continue
                 
@@ -695,7 +695,7 @@ async def core_proxy(request: Request):
                 resp_ctx = proxy_client.stream("POST", f"{BASE_URL}/v1/chat/completions", headers=headers, content=raw_body, timeout=90.0)
                 resp_stream = await resp_ctx.__aenter__()
                 
-                if resp_stream.status_code in (401, 402, 403, 429):
+                if resp_stream.status_code in (401, 402, 403, 429, 500, 502, 503, 504):
                     await resp_ctx.__aexit__(None, None, None)
                     add_log(f"Key {key_data['key'][:8]} streaming failed with {resp_stream.status_code}. Draining and shifting to NEXT key...")
                     await db.update_balance(key_data['key'], 0.0); continue
