@@ -271,7 +271,7 @@
                         <button onclick="showPasswordModal(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full">Change Password</button>
                         <div class="border-t border-white/10 my-1"></div>
                         <button onclick="exportData(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-[#00ffd6] font-bold w-full flex items-center gap-2">↓ Export Backup</button>
-                        <button onclick="document.getElementById('import-file').click(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-purple-400 font-bold w-full flex items-center gap-2">↑ Import Backup</button>
+                        <button onclick="triggerImport()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-purple-400 font-bold w-full flex items-center gap-2">↑ Import Backup</button>
                         <input type="file" id="import-file" style="display:none" accept="*/*" onchange="importData(event)">
                         <div class="border-t border-white/10 my-1"></div>
                         <button onclick="logout()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-red-400 w-full font-bold">Logout</button>
@@ -457,24 +457,50 @@
         let pendingConfirmCallback = null;
 
         function showToast(msg, isErr=false) { const t = document.getElementById('toast'); t.innerText = msg; t.className = `toast show ${isErr?'error':''}`; setTimeout(()=>t.classList.remove('show'), 4000); }
+        
         function showModal(id) { 
             const el = document.getElementById(id);
             el.classList.remove('hide'); 
+            
             if(window.innerWidth <= 768) {
-                const scaledScroll = window.scrollY / 0.65;
-                el.style.top = scaledScroll + 'px';
-                el.style.height = (window.innerHeight / 0.65) + 'px';
-                el.style.bottom = 'auto';
+                const scale = 0.65;
                 el.style.position = 'absolute';
+                el.style.top = '0px';
+                el.style.bottom = 'auto';
+                el.style.height = (Math.max(document.body.scrollHeight, window.innerHeight) / scale) + 'px';
+                
+                const panel = el.querySelector('.glass-panel');
+                if(panel) {
+                    const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+                    const centerY = (scrollY + (window.innerHeight / 2)) / scale;
+                    panel.style.position = 'absolute';
+                    panel.style.top = centerY + 'px';
+                    panel.style.left = '50%';
+                    panel.style.transform = 'translate(-50%, -50%)';
+                    panel.style.width = '90%';
+                    panel.style.margin = '0';
+                }
             }
         }
+        
         function hideModal(id) { 
             const el = document.getElementById(id);
             el.classList.add('hide'); 
             if(window.innerWidth <= 768) {
-                el.style.top = ''; el.style.height = ''; el.style.position = '';
+                el.style.position = ''; el.style.top = ''; el.style.bottom = ''; el.style.height = '';
+                const panel = el.querySelector('.glass-panel');
+                if(panel) {
+                    panel.style.position = ''; panel.style.top = ''; panel.style.left = ''; 
+                    panel.style.transform = ''; panel.style.width = ''; panel.style.margin = '';
+                }
             }
         }
+
+        function triggerImport() {
+            toggleMenu();
+            setTimeout(() => { document.getElementById('import-file').click(); }, 150);
+        }
+
         function customConfirm(msg, cb) { document.getElementById('confirm-msg').innerText = msg; showModal('modal-confirm'); pendingConfirmCallback = cb; }
         function proceedConfirm() { if(pendingConfirmCallback) pendingConfirmCallback(); hideModal('modal-confirm'); }
         function toggleDrop(id) { document.querySelectorAll('.select-options').forEach(el=>{if(el.id!=='opt-'+id) el.classList.remove('show')}); document.getElementById('opt-'+id).classList.toggle('show'); }
