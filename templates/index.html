@@ -51,6 +51,8 @@
             height: 280px;
             perspective: 1000px;
             margin-bottom: 1rem;
+            position: relative;
+            z-index: 1;
         }
         @media (min-width: 768px) {
             .parent-card {
@@ -92,6 +94,8 @@
             padding: 40px 40px 0px 25px;
             transform: translate3d(0, 0, 26px);
             pointer-events: none;
+            position: relative;
+            z-index: 20;
         }
         .content-3d .title {
             display: block;
@@ -503,7 +507,25 @@
 
         function customConfirm(msg, cb) { document.getElementById('confirm-msg').innerText = msg; showModal('modal-confirm'); pendingConfirmCallback = cb; }
         function proceedConfirm() { if(pendingConfirmCallback) pendingConfirmCallback(); hideModal('modal-confirm'); }
-        function toggleDrop(id) { document.querySelectorAll('.select-options').forEach(el=>{if(el.id!=='opt-'+id) el.classList.remove('show')}); document.getElementById('opt-'+id).classList.toggle('show'); }
+        function toggleDrop(id) { 
+            document.querySelectorAll('.select-options').forEach(el=>{if(el.id!=='opt-'+id) el.classList.remove('show')}); 
+            document.querySelectorAll('.parent-card').forEach(el => el.style.zIndex = '1');
+            const opt = document.getElementById('opt-'+id);
+            if (opt.classList.contains('show')) {
+                opt.classList.remove('show');
+            } else {
+                opt.classList.add('show');
+                const parent = opt.closest('.parent-card');
+                if (parent) parent.style.zIndex = '50';
+            }
+        }
+        
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.custom-select')) {
+                document.querySelectorAll('.select-options').forEach(el => el.classList.remove('show'));
+                document.querySelectorAll('.parent-card').forEach(el => el.style.zIndex = '1');
+            }
+        });
         
         async function setKeyProxy(k, pid) { await fetch('/admin/keys/proxy', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({key:k, proxy_id:pid?parseInt(pid):null}) }); refreshData(); }
         function toggleMenu() { const menu = document.getElementById('dropdown-menu'); menu.classList.toggle('hidden'); menu.classList.toggle('flex'); }
