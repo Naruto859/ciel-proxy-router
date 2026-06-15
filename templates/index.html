@@ -210,7 +210,7 @@
         .option-item:hover { background: var(--accent); color: #000; }
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="p-4 md:p-8 pt-2 md:pt-8">
     <div class="liquid-blob"></div>
     
     <!-- Login Overlay -->
@@ -244,7 +244,7 @@
     <main class="w-full max-w-7xl mx-auto hidden opacity-0 transition-opacity duration-500" id="dashboard">
         
         <!-- Header -->
-        <header class="flex justify-between items-center mb-10 relative mt-2">
+        <header class="flex justify-between items-center mb-6 relative mt-1">
             <div>
                 <h1 class="text-3xl md:text-5xl font-black tracking-tight text-white flex items-center gap-2">
                     <svg class="w-14 h-14 drop-shadow-[0_0_12px_rgba(0,255,214,0.6)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -272,7 +272,7 @@
                         <div class="border-t border-white/10 my-1"></div>
                         <button onclick="exportData(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-[#00ffd6] font-bold w-full flex items-center gap-2">↓ Export Backup</button>
                         <button onclick="document.getElementById('import-file').click(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-purple-400 font-bold w-full flex items-center gap-2">↑ Import Backup</button>
-                        <input type="file" id="import-file" style="display:none" accept=".json" onchange="importData(event)">
+                        <input type="file" id="import-file" style="display:none" accept="*/*" onchange="importData(event)">
                         <div class="border-t border-white/10 my-1"></div>
                         <button onclick="logout()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-red-400 w-full font-bold">Logout</button>
                     </div>
@@ -457,8 +457,24 @@
         let pendingConfirmCallback = null;
 
         function showToast(msg, isErr=false) { const t = document.getElementById('toast'); t.innerText = msg; t.className = `toast show ${isErr?'error':''}`; setTimeout(()=>t.classList.remove('show'), 4000); }
-        function showModal(id) { document.getElementById(id).classList.remove('hide'); }
-        function hideModal(id) { document.getElementById(id).classList.add('hide'); }
+        function showModal(id) { 
+            const el = document.getElementById(id);
+            el.classList.remove('hide'); 
+            if(window.innerWidth <= 768) {
+                const scaledScroll = window.scrollY / 0.65;
+                el.style.top = scaledScroll + 'px';
+                el.style.height = (window.innerHeight / 0.65) + 'px';
+                el.style.bottom = 'auto';
+                el.style.position = 'absolute';
+            }
+        }
+        function hideModal(id) { 
+            const el = document.getElementById(id);
+            el.classList.add('hide'); 
+            if(window.innerWidth <= 768) {
+                el.style.top = ''; el.style.height = ''; el.style.position = '';
+            }
+        }
         function customConfirm(msg, cb) { document.getElementById('confirm-msg').innerText = msg; showModal('modal-confirm'); pendingConfirmCallback = cb; }
         function proceedConfirm() { if(pendingConfirmCallback) pendingConfirmCallback(); hideModal('modal-confirm'); }
         function toggleDrop(id) { document.querySelectorAll('.select-options').forEach(el=>{if(el.id!=='opt-'+id) el.classList.remove('show')}); document.getElementById('opt-'+id).classList.toggle('show'); }
