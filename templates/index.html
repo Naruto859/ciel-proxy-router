@@ -216,8 +216,22 @@
     <!-- Login Overlay -->
     <div id="login-overlay" class="overlay">
         <div class="glass-panel p-8 w-full max-w-md text-center mx-4">
-            <div class="w-24 h-24 mx-auto mb-6 flex items-center justify-center rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(0,255,214,0.4)] border border-[#00ffd6]/30">
-                <img src="/static/logo.png" class="w-full h-full object-cover" alt="Logo">
+            <div class="mx-auto mb-6 flex items-center justify-center">
+                <!-- Premium SVG Ciel Logo -->
+                <svg class="w-28 h-28 drop-shadow-[0_0_15px_rgba(0,255,214,0.6)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="cielGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#00ffd6" />
+                            <stop offset="100%" stop-color="#08e260" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M50 10 L90 30 L90 70 L50 90 L10 70 L10 30 Z" stroke="url(#cielGrad)" stroke-width="4" stroke-linejoin="round" fill="rgba(0,255,214,0.1)"/>
+                    <path d="M50 20 L80 35 L80 65 L50 80 L20 65 L20 35 Z" stroke="url(#cielGrad)" stroke-width="2" stroke-linejoin="round"/>
+                    <circle cx="50" cy="50" r="12" fill="url(#cielGrad)"/>
+                    <line x1="50" y1="10" x2="50" y2="38" stroke="url(#cielGrad)" stroke-width="2"/>
+                    <line x1="10" y1="30" x2="39" y2="44" stroke="url(#cielGrad)" stroke-width="2"/>
+                    <line x1="90" y1="30" x2="61" y2="44" stroke="url(#cielGrad)" stroke-width="2"/>
+                </svg>
             </div>
             <h1 class="text-3xl font-bold mb-2 text-white">Ciel Gateway</h1>
             <p class="text-slate-400 mb-8 text-sm">Secure Admin Authentication</p>
@@ -230,21 +244,28 @@
     <main class="w-full max-w-7xl mx-auto hidden opacity-0 transition-opacity duration-500" id="dashboard">
         
         <!-- Header -->
-        <header class="flex justify-between items-center mb-8 relative">
+        <header class="flex justify-between items-center mb-10 relative mt-2">
             <div>
-                <h1 class="text-2xl md:text-4xl font-black tracking-tight text-white flex items-center gap-3">
-                    <img src="/static/logo.png" class="w-10 h-10 rounded-lg object-cover border border-[#00ffd6]/50 shadow-[0_0_15px_rgba(0,255,214,0.5)]">
+                <h1 class="text-3xl md:text-5xl font-black tracking-tight text-white flex items-center gap-2">
+                    <svg class="w-14 h-14 drop-shadow-[0_0_12px_rgba(0,255,214,0.6)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M50 10 L90 30 L90 70 L50 90 L10 70 L10 30 Z" stroke="url(#cielGrad)" stroke-width="4" stroke-linejoin="round" fill="rgba(0,255,214,0.1)"/>
+                        <path d="M50 20 L80 35 L80 65 L50 80 L20 65 L20 35 Z" stroke="url(#cielGrad)" stroke-width="2" stroke-linejoin="round"/>
+                        <circle cx="50" cy="50" r="12" fill="url(#cielGrad)"/>
+                        <line x1="50" y1="10" x2="50" y2="38" stroke="url(#cielGrad)" stroke-width="2"/>
+                        <line x1="10" y1="30" x2="39" y2="44" stroke="url(#cielGrad)" stroke-width="2"/>
+                        <line x1="90" y1="30" x2="61" y2="44" stroke="url(#cielGrad)" stroke-width="2"/>
+                    </svg>
                     CIEL
                 </h1>
-                <p class="text-slate-400 mt-1 text-sm md:text-base">Intelligent Multi-Agent Proxy</p>
+                <p class="text-slate-400 mt-2 text-sm md:text-lg">Intelligent Multi-Agent Proxy</p>
             </div>
-            <div class="flex items-center gap-3">
-                <button onclick="refreshAll()" class="refresh-btn px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2">
-                    <svg class="w-4 h-4 refresh-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            <div class="flex items-center gap-4">
+                <button onclick="refreshAll()" class="refresh-btn px-5 py-3 rounded-xl text-base font-bold flex items-center gap-2">
+                    <svg class="w-5 h-5 refresh-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     <span class="hidden md:inline">Refresh</span>
                 </button>
                 <div class="relative">
-                    <button onclick="toggleMenu()" class="refresh-btn p-2 rounded-xl text-xl leading-none w-10 h-10 flex items-center justify-center">⋮</button>
+                    <button onclick="toggleMenu()" class="refresh-btn p-3 rounded-xl text-2xl leading-none w-12 h-12 flex items-center justify-center">⋮</button>
                     <div id="dropdown-menu" class="absolute right-0 mt-2 w-56 glass-panel py-2 hidden flex-col z-50">
                         <button onclick="showPollingModal(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full uppercase font-black">Kernel Settings</button>
                         <button onclick="showPasswordModal(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full">Change Password</button>
