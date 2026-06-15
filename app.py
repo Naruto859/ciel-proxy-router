@@ -11,6 +11,7 @@ from typing import List, Dict, Optional
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, Request, Response, HTTPException, Depends, status
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -327,6 +328,7 @@ async def lifespan(app: FastAPI):
     await proxy_manager.close_all()
 
 app = FastAPI(lifespan=lifespan)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 security = HTTPBearer()
 
