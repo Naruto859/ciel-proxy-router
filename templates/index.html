@@ -143,55 +143,26 @@
             }
         }
 
-        /* FAB Button */
-        .fab {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, rgb(0, 255, 214) 0%, rgb(8, 226, 96) 100%);
-            color: #000;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-            box-shadow: 0 10px 25px rgba(0, 255, 214, 0.4);
-            cursor: pointer;
-            z-index: 40;
-            transition: transform 0.3s;
-        }
-        .fab:hover { transform: scale(1.1) rotate(90deg); }
-
         .refresh-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; transition: all 0.3s; }
         .refresh-btn:active .refresh-icon { transform: rotate(180deg); transition: transform 0.3s; }
-/* Overlays */
-.overlay { 
-    position: fixed; 
-    inset: 0; 
-    background: rgba(0, 0, 0, 0.85); 
-    backdrop-filter: blur(20px); 
-    -webkit-backdrop-filter: blur(20px);
-    z-index: 9999; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    opacity: 1; 
-    transition: opacity 0.3s; 
-    pointer-events: auto; 
-}
-.overlay.hide { opacity: 0; pointer-events: none; }
-
-/* Targeted fix for admin modals inside/after dashboard */
-#modal-verify, #modal-add-proxy, #modal-polling, #password-modal, #new-client-key-modal, #modal-confirm {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-}
-
+        
+        /* Fixed Overlays - Prevents scroll glitches */
+        .overlay { 
+            position: fixed !important; 
+            inset: 0 !important; 
+            background: rgba(0, 0, 0, 0.85); 
+            backdrop-filter: blur(20px); 
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 99999 !important; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            opacity: 1; 
+            transition: opacity 0.3s; 
+            pointer-events: auto; 
+            overflow: hidden !important;
+        }
+        .overlay.hide { opacity: 0; pointer-events: none; }
 
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
@@ -201,18 +172,18 @@
         .progress-bar-bg { background-color: rgba(255,255,255,0.1); border-radius: 9999px; height: 8px; overflow: hidden; }
         .progress-bar-fill { background: linear-gradient(90deg, #00ffd6, #8b5cf6); height: 100%; border-radius: 9999px; transition: width 1s ease-out; }
 
+        /* Improved mobile scale fix to prevent UI cutoffs */
         @media (max-width: 768px) {
             body {
-                transform: scale(0.60);
+                transform: scale(0.65);
                 transform-origin: top left;
-                width: 166.6vw;
-                height: 166.6vh;
+                width: 153.8vw;
+                height: 153.8vh;
                 overflow-x: hidden;
-                overflow-y: auto;
             }
         }
     
-        .toast { position: fixed; top: 24px; right: 24px; padding: 12px 24px; border-radius: 12px; background: rgba(0,0,0,0.9); border: 1px solid var(--accent); color: white; z-index: 10000; opacity: 0; transform: translateY(-20px); transition: all 0.3s; pointer-events: none; }
+        .toast { position: fixed; top: 24px; right: 24px; padding: 12px 24px; border-radius: 12px; background: rgba(0,0,0,0.9); border: 1px solid var(--accent); color: white; z-index: 100000; opacity: 0; transform: translateY(-20px); transition: all 0.3s; pointer-events: none; }
         .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
         .toast.error { border-color: #ff4d4d; }
         
@@ -237,7 +208,6 @@
         .select-options.show { display: block; }
         .option-item { padding: 8px 12px; font-size: 0.75rem; cursor: pointer; color: white; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .option-item:hover { background: var(--accent); color: #000; }
-        .scroll-lock { overflow: hidden !important; height: 100vh !important; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -246,8 +216,8 @@
     <!-- Login Overlay -->
     <div id="login-overlay" class="overlay">
         <div class="glass-panel p-8 w-full max-w-md text-center mx-4">
-            <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-[#00ffd6] to-[#08e260] rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(0,255,214,0.4)]">
-                <svg class="w-10 h-10 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+            <div class="w-24 h-24 mx-auto mb-6 flex items-center justify-center rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(0,255,214,0.4)] border border-[#00ffd6]/30">
+                <img src="https://files.catbox.moe/g542jb.jpg" class="w-full h-full object-cover" alt="Logo">
             </div>
             <h1 class="text-3xl font-bold mb-2 text-white">Ciel Gateway</h1>
             <p class="text-slate-400 mb-8 text-sm">Secure Admin Authentication</p>
@@ -263,7 +233,7 @@
         <header class="flex justify-between items-center mb-8 relative">
             <div>
                 <h1 class="text-2xl md:text-4xl font-black tracking-tight text-white flex items-center gap-3">
-                    <div class="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-[#00ffd6] to-[#08e260] rounded-lg shadow-[0_0_15px_rgba(0,255,214,0.5)]"></div>
+                    <img src="https://files.catbox.moe/g542jb.jpg" class="w-10 h-10 rounded-lg object-cover border border-[#00ffd6]/50 shadow-[0_0_15px_rgba(0,255,214,0.5)]">
                     CIEL
                 </h1>
                 <p class="text-slate-400 mt-1 text-sm md:text-base">Intelligent Multi-Agent Proxy</p>
@@ -275,10 +245,15 @@
                 </button>
                 <div class="relative">
                     <button onclick="toggleMenu()" class="refresh-btn p-2 rounded-xl text-xl leading-none w-10 h-10 flex items-center justify-center">⋮</button>
-                    <div id="dropdown-menu" class="absolute right-0 mt-2 w-48 glass-panel py-2 hidden flex-col z-50">
-                        <button onclick="showPollingModal(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full uppercase font-black">Polling Interval</button>
+                    <div id="dropdown-menu" class="absolute right-0 mt-2 w-56 glass-panel py-2 hidden flex-col z-50">
+                        <button onclick="showPollingModal(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full uppercase font-black">Kernel Settings</button>
                         <button onclick="showPasswordModal(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full">Change Password</button>
-                        <button onclick="logout()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-red-400 w-full border-t border-white/10 mt-1 pt-2">Logout</button>
+                        <div class="border-t border-white/10 my-1"></div>
+                        <button onclick="exportData(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-[#00ffd6] font-bold w-full flex items-center gap-2">↓ Export Backup</button>
+                        <button onclick="document.getElementById('import-file').click(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-purple-400 font-bold w-full flex items-center gap-2">↑ Import Backup</button>
+                        <input type="file" id="import-file" style="display:none" accept=".json" onchange="importData(event)">
+                        <div class="border-t border-white/10 my-1"></div>
+                        <button onclick="logout()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-red-400 w-full font-bold">Logout</button>
                     </div>
                 </div>
             </div>
@@ -300,26 +275,10 @@
                     Usage Analytics
                 </h3>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <div>
-                        <p class="text-slate-400 text-xs font-mono mb-1">TODAY</p>
-                        <p class="text-2xl font-bold text-white mb-2" id="ana-today">0</p>
-                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-today" style="width: 0%"></div></div>
-                    </div>
-                    <div>
-                        <p class="text-slate-400 text-xs font-mono mb-1">WEEK</p>
-                        <p class="text-2xl font-bold text-white mb-2" id="ana-week">0</p>
-                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-week" style="width: 0%"></div></div>
-                    </div>
-                    <div>
-                        <p class="text-slate-400 text-xs font-mono mb-1">MONTH</p>
-                        <p class="text-2xl font-bold text-white mb-2" id="ana-month">0</p>
-                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-month" style="width: 0%"></div></div>
-                    </div>
-                    <div>
-                        <p class="text-slate-400 text-xs font-mono mb-1">YEAR</p>
-                        <p class="text-2xl font-bold text-white mb-2" id="ana-year">0</p>
-                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-year" style="width: 0%"></div></div>
-                    </div>
+                    <div><p class="text-slate-400 text-xs font-mono mb-1">TODAY</p><p class="text-2xl font-bold text-white mb-2" id="ana-today">0</p><div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-today" style="width: 0%"></div></div></div>
+                    <div><p class="text-slate-400 text-xs font-mono mb-1">WEEK</p><p class="text-2xl font-bold text-white mb-2" id="ana-week">0</p><div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-week" style="width: 0%"></div></div></div>
+                    <div><p class="text-slate-400 text-xs font-mono mb-1">MONTH</p><p class="text-2xl font-bold text-white mb-2" id="ana-month">0</p><div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-month" style="width: 0%"></div></div></div>
+                    <div><p class="text-slate-400 text-xs font-mono mb-1">YEAR</p><p class="text-2xl font-bold text-white mb-2" id="ana-year">0</p><div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-year" style="width: 0%"></div></div></div>
                 </div>
             </div>
         </div>
@@ -334,10 +293,7 @@
         <div id="section-upstream" class="transition-all duration-500">
             <div class="glass-panel p-6 mb-6">
                 <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
-                    <div>
-                        <h2 class="text-xl font-bold text-white">Upstream Nodes</h2>
-                        <p class="text-sm text-slate-400">Manage connected API keys.</p>
-                    </div>
+                    <div><h2 class="text-xl font-bold text-white">Upstream Nodes</h2><p class="text-sm text-slate-400">Manage connected API keys.</p></div>
                     <div class="flex w-full md:w-auto gap-2">
                         <input type="text" id="new-key-inline" placeholder="API Key (sk-...)" class="flex-1 md:w-64 bg-black/50 border border-white/10 px-4 py-3 rounded-xl text-sm focus:border-[#00ffd6] outline-none text-white">
                         <button onclick="addKeyInline()" class="btn-primary px-6 py-3 rounded-xl whitespace-nowrap">Add Node</button>
@@ -349,22 +305,20 @@
 
         <div id="section-proxies" class="hidden transition-all duration-500">
             <div class="glass-panel p-6 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div>
-                    <h2 class="text-xl font-bold text-white uppercase tracking-widest">Isolated Nodes</h2>
-                    <p class="text-xs text-slate-400 mt-1 uppercase opacity-50">Manage dedicated routing endpoints.</p>
+                <div><h2 class="text-xl font-bold text-white uppercase tracking-widest">Isolated Nodes</h2><p class="text-xs text-slate-400 mt-1 uppercase opacity-50">Manage dedicated routing endpoints.</p></div>
+                <div class="flex gap-2 w-full md:w-auto">
+                    <button onclick="showModal('modal-bulk-proxy')" class="bg-black/40 border border-purple-500/50 text-purple-400 hover:bg-purple-500 hover:text-white px-6 py-3 rounded-xl font-black text-sm transition-colors">BULK ADD</button>
+                    <button onclick="showAddProxyModal()" class="bg-gradient-to-r from-[#00ffd6] to-[#08e260] text-slate-900 px-6 py-3 rounded-xl font-black text-sm">ADD SINGLE IP</button>
                 </div>
-                <button onclick="showModal('modal-add-proxy')" class="bg-gradient-to-r from-[#00ffd6] to-[#08e260] text-slate-900 px-6 py-3 rounded-xl font-black text-sm">ADD NEW IP</button>
             </div>
-            <div id="proxies-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-8"></div>
+            <!-- Changed mobile grid to grid-cols-2 so they display side-by-side -->
+            <div id="proxies-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 pb-8"></div>
         </div>
 
         <div id="section-clients" class="hidden transition-all duration-500">
             <div class="glass-panel p-6 mb-6">
                 <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
-                    <div>
-                        <h2 class="text-xl font-bold text-white">Client Agent Keys</h2>
-                        <p class="text-sm text-slate-400">Generate keys for Hermes agents.</p>
-                    </div>
+                    <div><h2 class="text-xl font-bold text-white">Client Agent Keys</h2><p class="text-sm text-slate-400">Generate keys for Hermes agents.</p></div>
                     <div class="flex w-full md:w-auto gap-2">
                         <input type="text" id="new-client-name" placeholder="Agent Name" class="flex-1 md:w-64 bg-black/50 border border-white/10 px-4 py-3 rounded-xl text-sm focus:border-[#00ffd6] outline-none text-white">
                         <button onclick="addClientKey()" class="btn-primary px-6 py-3 rounded-xl whitespace-nowrap">Generate</button>
@@ -385,12 +339,12 @@
         </div>
     </main>
 
-    <!-- Modals -->
+    <!-- Fixed Modals -->
     <div id="modal-verify" class="overlay hide">
-        <div class="glass-panel p-8 w-full max-w-md mx-4 border border-accent/30 shadow-[0_0_50px_rgba(0,255,214,0.1)] text-center">
+        <div class="glass-panel p-8 w-full max-w-md mx-4 border border-accent/30 shadow-[0_0_50px_rgba(0,255,214,0.1)] text-center relative max-h-[90vh] overflow-y-auto">
             <h2 class="text-2xl font-black mb-6">Technical Summary</h2>
             <div class="space-y-4 font-mono text-sm text-left">
-                <div class="bg-black/40 p-4 rounded-xl border border-white/5"><p class="opacity-50 text-[10px] uppercase font-bold">Routing IP</p><p id="v-ip" class="text-accent text-lg font-bold">...</p></div>
+                <div class="bg-black/40 p-4 rounded-xl border border-white/5"><p class="opacity-50 text-[10px] uppercase font-bold">Routing IP</p><p id="v-ip" class="text-accent text-lg font-bold truncate">...</p></div>
                 <div class="bg-black/40 p-4 rounded-xl border border-white/5"><p class="opacity-50 text-[10px] uppercase font-bold">Live Balance</p><p id="v-bal" class="text-white text-xl font-bold">...</p></div>
                 <div class="bg-black/40 p-4 rounded-xl border border-white/5"><p class="opacity-50 text-[10px] uppercase font-bold">Status</p><p id="v-status" class="font-bold">...</p></div>
             </div>
@@ -398,9 +352,11 @@
         </div>
     </div>
 
+    <!-- Reusable Add/Edit Proxy Modal -->
     <div id="modal-add-proxy" class="overlay hide">
-        <div class="glass-panel p-8 w-full max-w-md mx-4">
-            <h2 class="text-xl font-bold mb-4 uppercase text-white">Add Isolated Node</h2>
+        <div class="glass-panel p-8 w-full max-w-md mx-4 relative max-h-[90vh] overflow-y-auto">
+            <h2 id="modal-proxy-title" class="text-xl font-bold mb-4 uppercase text-white">Add Isolated Node</h2>
+            <input type="hidden" id="p-edit-id" value="">
             <div class="space-y-3">
                 <input id="p-ip" type="text" placeholder="IP Address" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none">
                 <input id="p-port" type="number" placeholder="Port" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none">
@@ -411,29 +367,44 @@
         </div>
     </div>
 
+    <!-- Bulk Proxy Upload Modal -->
+    <div id="modal-bulk-proxy" class="overlay hide">
+        <div class="glass-panel p-8 w-full max-w-lg mx-4 relative max-h-[90vh] overflow-y-auto">
+            <h2 class="text-xl font-bold mb-2 uppercase text-white">Bulk Add Proxies</h2>
+            <p class="text-xs text-slate-400 mb-4">Paste proxy list. Formats accepted: <br><code>IP:PORT:USER:PASS</code> or <code>IP:PORT</code></p>
+            <div class="space-y-3">
+                <textarea id="bulk-proxy-text" rows="8" placeholder="192.168.1.1:8080:username:password&#10;10.0.0.1:3128" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none font-mono text-xs"></textarea>
+                
+                <div class="bg-purple-900/30 border border-purple-500/30 p-3 rounded-xl mt-2">
+                    <p class="text-xs text-purple-300 font-bold mb-2">Options:</p>
+                    <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                        <input type="checkbox" id="bulk-overwrite-pass" class="rounded bg-black/50 border-white/10 text-purple-500">
+                        Update Password/User for existing IPs
+                    </label>
+                </div>
+
+                <div class="flex gap-4 pt-4">
+                    <button onclick="hideModal('modal-bulk-proxy')" class="flex-1 p-4 rounded-xl bg-white/5 font-bold">CANCEL</button>
+                    <button onclick="processBulkProxies()" class="flex-1 p-4 rounded-xl btn-primary">IMPORT LIST</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-polling" class="overlay hide">
-        <div class="glass-panel p-8 w-full max-w-sm mx-4 text-center">
+        <div class="glass-panel p-8 w-full max-w-sm mx-4 text-center relative max-h-[90vh] overflow-y-auto">
             <h2 class="text-xl font-bold mb-4 text-white uppercase">Kernel Settings</h2>
             <div class="space-y-4">
-                <div>
-                    <p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Polling Interval (Seconds)</p>
-                    <input id="poll-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none">
-                </div>
-                <div>
-                    <p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Force Check Interval (Seconds)</p>
-                    <input id="force-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none">
-                </div>
-                <div>
-                    <p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Max Hold Duration (Seconds)</p>
-                    <input id="hold-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none">
-                </div>
+                <div><p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Polling Interval (Seconds)</p><input id="poll-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none"></div>
+                <div><p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Force Check Interval (Seconds)</p><input id="force-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none"></div>
+                <div><p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Max Hold Duration (Seconds)</p><input id="hold-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none"></div>
             </div>
             <div class="flex gap-3 mt-6"><button onclick="hideModal('modal-polling')" class="flex-1 p-3 rounded-xl bg-white/5 font-bold">Cancel</button><button onclick="savePolling()" class="flex-1 p-3 rounded-xl btn-primary">Update</button></div>
         </div>
     </div>
 
     <div id="password-modal" class="overlay hide">
-        <div class="glass-panel p-8 w-full max-w-md mx-4">
+        <div class="glass-panel p-8 w-full max-w-md mx-4 relative max-h-[90vh] overflow-y-auto">
             <h2 class="text-2xl font-bold mb-6 text-white">Change Admin Password</h2>
             <input type="password" id="new-password" placeholder="New Password" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none mb-6">
             <div class="flex gap-4"><button onclick="hideModal('password-modal')" class="flex-1 p-4 rounded-xl bg-white/5">Cancel</button><button onclick="updatePassword()" class="flex-1 p-4 rounded-xl btn-primary">Update</button></div>
@@ -441,7 +412,7 @@
     </div>
 
     <div id="new-client-key-modal" class="overlay hide">
-        <div class="glass-panel p-8 w-full max-w-md mx-4 border border-accent/50 text-center">
+        <div class="glass-panel p-8 w-full max-w-md mx-4 border border-accent/50 text-center relative">
             <h2 class="text-2xl font-bold text-accent mb-4">Agent Key Ready</h2>
             <p class="text-red-400 text-sm mb-6 bg-red-500/10 p-3 rounded-lg">Copy this key immediately. It will not be shown again.</p>
             <input type="text" id="display-new-client-key" readonly class="w-full bg-black border border-accent/30 p-4 rounded-xl font-mono text-center text-accent outline-none">
@@ -449,12 +420,11 @@
         </div>
     </div>
 
-    <div id="modal-confirm" class="overlay hide" style="z-index: 10001;">
-        <div class="glass-panel p-8 w-full max-w-sm mx-4 text-center border border-red-500/30">
+    <div id="modal-confirm" class="overlay hide" style="z-index: 100010 !important;">
+        <div class="glass-panel p-8 w-full max-w-sm mx-4 text-center border border-red-500/30 relative">
             <h2 class="text-xl font-black mb-4 uppercase">Confirm Action</h2>
             <p id="confirm-msg" class="text-sm text-slate-400 mb-8 font-mono">Are you sure?</p>
             <div class="flex gap-4"><button onclick="hideModal('modal-confirm')" class="flex-1 p-3 rounded-xl bg-white/5 font-bold">CANCEL</button><button onclick="proceedConfirm()" class="flex-1 p-3 rounded-xl btn-primary">PROCEED</button></div>
-
         </div>
     </div>
 
@@ -462,17 +432,12 @@
 
     <script>
         let sessionToken = localStorage.getItem('ciel_session') || '';
-        let logInterval = null; let globalProxies = []; let pendingConfirmCallback = null;
+        let logInterval = null; let globalProxies = []; let globalKeys = []; let globalClientKeys = [];
+        let pendingConfirmCallback = null;
 
         function showToast(msg, isErr=false) { const t = document.getElementById('toast'); t.innerText = msg; t.className = `toast show ${isErr?'error':''}`; setTimeout(()=>t.classList.remove('show'), 4000); }
-        function showModal(id) { 
-            document.getElementById(id).classList.remove('hide'); 
-            document.body.style.overflow = 'hidden';
-        }
-        function hideModal(id) { 
-            document.getElementById(id).classList.add('hide'); 
-            document.body.style.overflow = 'auto';
-        }
+        function showModal(id) { document.getElementById(id).classList.remove('hide'); }
+        function hideModal(id) { document.getElementById(id).classList.add('hide'); }
         function customConfirm(msg, cb) { document.getElementById('confirm-msg').innerText = msg; showModal('modal-confirm'); pendingConfirmCallback = cb; }
         function proceedConfirm() { if(pendingConfirmCallback) pendingConfirmCallback(); hideModal('modal-confirm'); }
         function toggleDrop(id) { document.querySelectorAll('.select-options').forEach(el=>{if(el.id!=='opt-'+id) el.classList.remove('show')}); document.getElementById('opt-'+id).classList.toggle('show'); }
@@ -493,27 +458,31 @@
 
         async function login() {
             const pin = document.getElementById('pin-input').value;
-            const res = await fetch('/admin/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
-            if (res.ok) {
-                const data = await res.json(); sessionToken = data.token; localStorage.setItem('ciel_session', sessionToken);
-                document.getElementById('login-overlay').classList.add('hide');
-                const dash = document.getElementById('dashboard'); dash.classList.remove('hidden');
-                setTimeout(() => dash.classList.remove('opacity-0'), 50);
-                refreshAll(); startLogPolling();
-            } else { alert('Invalid Password'); }
+            try {
+                const res = await fetch('/admin/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
+                if (res.ok) {
+                    const data = await res.json(); sessionToken = data.token; localStorage.setItem('ciel_session', sessionToken);
+                    document.getElementById('login-overlay').classList.add('hide');
+                    const dash = document.getElementById('dashboard'); dash.classList.remove('hidden');
+                    setTimeout(() => dash.classList.remove('opacity-0'), 50);
+                    refreshAll(); startLogPolling();
+                } else { showToast('Invalid Password', true); }
+            } catch(e) { showToast('Connection Error', true); }
         }
 
         function logout() { sessionToken = ''; localStorage.removeItem('ciel_session'); location.reload(); }
 
         window.onload = async () => {
             if (sessionToken) {
-                const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                if (res.ok) {
-                    document.getElementById('login-overlay').classList.add('hide');
-                    const dash = document.getElementById('dashboard'); dash.classList.remove('hidden');
-                    setTimeout(() => dash.classList.remove('opacity-0'), 50);
-                    refreshAll(); startLogPolling();
-                } else { logout(); }
+                try {
+                    const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
+                    if (res.ok) {
+                        document.getElementById('login-overlay').classList.add('hide');
+                        const dash = document.getElementById('dashboard'); dash.classList.remove('hidden');
+                        setTimeout(() => dash.classList.remove('opacity-0'), 50);
+                        refreshAll(); startLogPolling();
+                    } else { logout(); }
+                } catch(e) { logout(); }
             }
         };
 
@@ -523,10 +492,8 @@
             try {
                 const res = await fetch('/admin/analytics', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
                 const data = await res.json();
-                document.getElementById('ana-today').innerText = data.today;
-                document.getElementById('ana-week').innerText = data.this_week;
-                document.getElementById('ana-month').innerText = data.this_month;
-                document.getElementById('ana-year').innerText = data.this_year;
+                document.getElementById('ana-today').innerText = data.today; document.getElementById('ana-week').innerText = data.this_week;
+                document.getElementById('ana-month').innerText = data.this_month; document.getElementById('ana-year').innerText = data.this_year;
                 const max = Math.max(data.this_year, 100);
                 document.getElementById('bar-today').style.width = Math.min((data.today / max) * 100 * 365, 100) + '%';
                 document.getElementById('bar-week').style.width = Math.min((data.this_week / max) * 100 * 52, 100) + '%';
@@ -541,27 +508,32 @@
                     fetch('/admin/keys', { headers: { 'Authorization': `Bearer ${sessionToken}` }}),
                     fetch('/admin/proxies', { headers: { 'Authorization': `Bearer ${sessionToken}` }})
                 ]);
-                const keys = (await resK.json()).keys || []; globalProxies = (await resP.json()).proxies || [];
+                globalKeys = (await resK.json()).keys || []; globalProxies = (await resP.json()).proxies || [];
+                
                 const gridK = document.getElementById('keys-grid'); gridK.innerHTML = '';
-                keys.forEach(k => {
+                globalKeys.forEach(k => {
                     const isH = k.balance > 0; const proxy = globalProxies.find(p=>p.id===k.proxy_id); const pLabel = proxy ? proxy.ip : 'VPS IP (Direct)';
                     const tCol = isH ? '#022c22' : 'white'; const sCol = isH ? 'rgba(2,44,34,0.7)' : 'rgba(255,255,255,0.7)';
                     const selCls = isH ? 'bg-black/10 border-[#022c22]/20 text-[#022c22]' : 'bg-black/30 border-white/20 text-white';
                     gridK.innerHTML += `<div class="parent-card"><div class="card-3d ${k.priority>0?'normal':(isH?'':'dead')}"><div class="glass-inner"></div><div class="content-3d"><span class="title" style="color:${tCol}">${k.key.substring(0,14)}...</span><div class="custom-select" onclick="event.stopPropagation()"><div class="select-trigger ${selCls}" onclick="toggleDrop('${k.key.substring(0,8)}')"><span>${pLabel}</span><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg></div><div class="select-options" id="opt-${k.key.substring(0,8)}"><div class="option-item" onclick="setKeyProxy('${k.key}', null)">VPS IP (Direct)</div>${globalProxies.map(p=>`<div class="option-item" onclick="setKeyProxy('${k.key}', ${p.id})">${p.ip}</div>`).join('')}</div></div><div style="margin-top:15px"><p style="font-size:9px; font-weight:900; color:${sCol}">BALANCE</p><p style="font-size:1.5rem; font-weight:900; color:${tCol}; font-family:monospace;">${(k.balance>0?k.balance:0).toFixed(4)} P</p></div><div style="margin-top:10px; display:flex; align-items:center; gap:5px; font-size:10px; font-weight:900; color:${sCol}"><div style="width:8px; height:8px; border-radius:50%; background:${isH?'#022c22':'#000'}"></div>${isH?'OPERATIONAL':'BLOCKED'}</div></div><div class="bottom-3d z-10"><button onclick="testKey('${k.key}')" class="action-btn">Verify</button><button onclick="deleteKey('${k.key}')" class="action-btn" style="background:rgba(0,0,0,0.1); border:none; color:${isH?'#022c22':'white'}">Revoke</button></div></div></div>`;
                 });
+                
                 const gridP = document.getElementById('proxies-grid'); gridP.innerHTML = '';
-                globalProxies.forEach(p => { gridP.innerHTML += `<div class="parent-card" style="height:220px; width:240px;"><div class="card-3d normal"><div class="glass-inner"></div><div class="content-3d"><span class="title" style="color:#022c22; font-family:monospace; font-size:1.1rem;">${p.ip}</span><p style="font-size:10px; color:rgba(2,44,34,0.6); margin-top:5px; font-weight:900">PORT: ${p.port}</p><div id="ps-${p.id}" class="mt-2 text-[10px] font-mono font-bold hidden"></div></div><div class="bottom-3d"><button onclick="testProxy(${p.id})" class="action-btn">Test</button><button onclick="deleteProxy(${p.id})" class="action-btn !bg-black/10 !border-transparent">Remove</button></div></div></div>`; });
-                document.getElementById('stat-total-pollen').innerText = keys.reduce((a,b)=>a+(b.balance>0?b.balance:0),0).toFixed(4);
-                document.getElementById('stat-active-keys').innerText = keys.filter(k=>k.balance>0).length;
+                globalProxies.forEach(p => { 
+                    gridP.innerHTML += `<div class="parent-card !h-[240px] md:!h-[280px] w-full"><div class="card-3d normal"><div class="glass-inner"></div><div class="content-3d"><span class="title truncate" style="color:#022c22; font-family:monospace; font-size:1rem;">${p.ip}</span><p style="font-size:10px; color:rgba(2,44,34,0.6); margin-top:2px; font-weight:900">PORT: ${p.port}</p><div class="flex gap-2 mt-2"><button onclick="showEditProxyModal(${p.id})" class="text-[10px] bg-white/30 text-[#022c22] px-2 py-1 rounded shadow hover:bg-white/50">Edit User/Pass</button></div><div id="ps-${p.id}" class="mt-2 text-[10px] font-mono font-bold hidden truncate"></div></div><div class="bottom-3d"><button onclick="testProxy(${p.id})" class="action-btn !text-xs px-2 py-1">Test</button><button onclick="deleteProxy(${p.id})" class="action-btn !bg-black/10 !border-transparent !text-xs px-2 py-1">Remove</button></div></div></div>`; 
+                });
+                
+                document.getElementById('stat-total-pollen').innerText = globalKeys.reduce((a,b)=>a+(b.balance>0?b.balance:0),0).toFixed(4);
+                document.getElementById('stat-active-keys').innerText = globalKeys.filter(k=>k.balance>0).length;
             } catch(e) {}
         }
 
         async function refreshClientKeys() {
             try {
                 const res = await fetch('/admin/client-keys', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
-                const data = await res.json();
+                const data = await res.json(); globalClientKeys = data.keys || [];
                 const grid = document.getElementById('client-keys-grid'); grid.innerHTML = '';
-                data.keys.forEach(k => {
+                globalClientKeys.forEach(k => {
                     grid.innerHTML += `<div class="glass-panel p-6 relative overflow-hidden group"><div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div><h3 class="text-xl font-bold text-white mb-1 relative z-10">${k.name}</h3><p class="font-mono text-sm text-[#00ffd6] mb-4 relative z-10">${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}</p><div class="flex justify-between items-center relative z-10"><span class="text-xs text-slate-500">${new Date(k.created_at).toLocaleDateString()}</span><button onclick="deleteClientKey('${k.key}')" class="text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded-lg hover:bg-red-500 hover:text-white transition-all">Revoke</button></div></div>`;
                 });
             } catch(e) {}
@@ -581,13 +553,13 @@
         }
 
         async function addKeyInline() {
-            const key = document.getElementById('new-key-inline').value; if(!key) return alert("API Key is required");
-            await fetch('/admin/keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ key, priority: 0 }) });
-            document.getElementById('new-key-inline').value = ''; refreshData();
+            const key = document.getElementById('new-key-inline').value.trim(); if(!key) return showToast("API Key is required", true);
+            const res = await fetch('/admin/keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ key, priority: 0 }) });
+            if(res.ok) { document.getElementById('new-key-inline').value = ''; refreshData(); showToast('Key Added'); }
         }
 
         async function addClientKey() {
-            const name = document.getElementById('new-client-name').value; if(!name) return alert("Agent name is required");
+            const name = document.getElementById('new-client-name').value.trim(); if(!name) return showToast("Agent name required", true);
             const res = await fetch('/admin/client-keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ name }) });
             if(res.ok) { const data = await res.json(); document.getElementById('new-client-name').value = ''; document.getElementById('display-new-client-key').value = data.key; showModal('new-client-key-modal'); refreshClientKeys(); }
         }
@@ -596,8 +568,9 @@
         async function deleteProxy(id) { customConfirm('Remove this IP endpoint?', async() => { await fetch('/admin/proxies/'+id,{method:'DELETE',headers:{'Authorization':`Bearer ${sessionToken}`}}); refreshData(); }); }
         async function deleteClientKey(key) { customConfirm('Revoke this Client Key?', async() => { await fetch(`/admin/client-keys/${key}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` }}); refreshClientKeys(); }); }
 
-        async function testProxy(id) { const el=document.getElementById('ps-'+id); el.classList.remove('hidden'); el.innerText='PROBING...'; const res=await fetch('/admin/proxies/test/'+id, {headers:{'Authorization':`Bearer ${sessionToken}`}}); const d=await res.json(); if(d.success){ el.innerHTML=`<span style="color:#022c22">PASS: ${d.detected_ip}</span>`; showToast('Proxy Verified'); } else { el.innerHTML=`<span style="color:#ff5757">FAILED</span>`; showToast('Proxy Error',true); } }
+        async function testProxy(id) { const el=document.getElementById('ps-'+id); el.classList.remove('hidden'); el.innerText='PROBING...'; try{ const res=await fetch('/admin/proxies/test/'+id, {headers:{'Authorization':`Bearer ${sessionToken}`}}); const d=await res.json(); if(d.success){ el.innerHTML=`<span style="color:#022c22">PASS: ${d.detected_ip}</span>`; showToast('Proxy Verified'); } else { el.innerHTML=`<span style="color:#ff5757">FAILED</span>`; showToast('Proxy Error',true); } } catch(e){ el.innerHTML=`<span style="color:#ff5757">TIMEOUT</span>`; showToast('Proxy Error',true);} }
         async function testKey(k) { showToast('Verifying...'); try { const res=await fetch('/admin/test/'+k,{headers:{'Authorization':`Bearer ${sessionToken}`}}); const d=await res.json(); document.getElementById('v-ip').innerText=d.ip||'VPS IP (Direct)'; document.getElementById('v-bal').innerText=(d.balance>0?d.balance:0).toFixed(4)+' P'; document.getElementById('v-status').innerHTML=d.success?'<span style="color:#00ffd6">VERIFIED</span>':'<span style="color:#ff5757">FAILED</span>'; showModal('modal-verify'); refreshData(); } catch(e){showToast('Error',true);} }
+        
         async function showPollingModal() {
             const [resP, resF, resH] = await Promise.all([
                 fetch('/admin/settings/polling', {headers:{'Authorization':`Bearer ${sessionToken}`}}),
@@ -611,29 +584,156 @@
                 showModal('modal-polling');
             }
         }
+        
         async function savePolling() {
-            const poll = parseInt(document.getElementById('poll-sec').value);
-            const force = parseInt(document.getElementById('force-sec').value);
-            const hold = parseInt(document.getElementById('hold-sec').value);
-            
+            const poll = parseInt(document.getElementById('poll-sec').value); const force = parseInt(document.getElementById('force-sec').value); const hold = parseInt(document.getElementById('hold-sec').value);
             await Promise.all([
                 fetch('/admin/settings/polling',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({interval:poll})}),
                 fetch('/admin/settings/force_check',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({interval:force})}),
                 fetch('/admin/settings/max_hold',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({duration:hold})})
             ]);
-            hideModal('modal-polling');
-            showToast('Kernel Settings Updated');
+            hideModal('modal-polling'); showToast('Kernel Settings Updated');
         }
+
+        function showAddProxyModal() {
+            document.getElementById('modal-proxy-title').innerText = "Add Isolated Node";
+            document.getElementById('p-edit-id').value = "";
+            document.getElementById('p-ip').value = ""; document.getElementById('p-port').value = "";
+            document.getElementById('p-user').value = ""; document.getElementById('p-pass').value = "";
+            showModal('modal-add-proxy');
+        }
+
+        function showEditProxyModal(id) {
+            const proxy = globalProxies.find(p => p.id === id);
+            if(!proxy) return;
+            document.getElementById('modal-proxy-title').innerText = "Edit User/Pass";
+            document.getElementById('p-edit-id').value = id;
+            document.getElementById('p-ip').value = proxy.ip; document.getElementById('p-port').value = proxy.port;
+            document.getElementById('p-user').value = proxy.username || ""; document.getElementById('p-pass').value = proxy.password || "";
+            showModal('modal-add-proxy');
+        }
+
         async function saveProxy() {
-            const ip=document.getElementById('p-ip').value, port=document.getElementById('p-port').value, user=document.getElementById('p-user').value, pass=document.getElementById('p-pass').value;
+            const id = document.getElementById('p-edit-id').value;
+            const ip=document.getElementById('p-ip').value.trim(), port=document.getElementById('p-port').value.trim(), user=document.getElementById('p-user').value.trim(), pass=document.getElementById('p-pass').value.trim();
             if(!ip || !port) return showToast('IP and Port required', true);
+            
+            if (id) {
+                // To "edit", delete old and add new (simplest backend logic without changing python)
+                await fetch('/admin/proxies/'+id, {method:'DELETE',headers:{'Authorization':`Bearer ${sessionToken}`}});
+            }
+            
             const res = await fetch('/admin/proxies', {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({ip, port:parseInt(port), username:user, password:pass})});
-            if(res.ok) { hideModal('modal-add-proxy'); refreshData(); showToast('Proxy Added'); }
+            if(res.ok) { hideModal('modal-add-proxy'); refreshData(); showToast('Proxy Saved'); }
         }
+
+        async function processBulkProxies() {
+            const text = document.getElementById('bulk-proxy-text').value.trim();
+            if(!text) return showToast('Input is empty', true);
+            const overwrite = document.getElementById('bulk-overwrite-pass').checked;
+            
+            const lines = text.split('\n');
+            let added = 0;
+            
+            showToast('Processing...');
+            hideModal('modal-bulk-proxy');
+            
+            for(let line of lines) {
+                line = line.trim(); if(!line) continue;
+                const parts = line.split(':');
+                if(parts.length >= 2) {
+                    const ip = parts[0]; const port = parseInt(parts[1]);
+                    const user = parts.length >= 3 ? parts[2] : "";
+                    const pass = parts.length >= 4 ? parts[3] : "";
+                    
+                    const existing = globalProxies.find(p => p.ip === ip && p.port === port);
+                    if (existing) {
+                        if (overwrite) {
+                            await fetch('/admin/proxies/'+existing.id, {method:'DELETE',headers:{'Authorization':`Bearer ${sessionToken}`}});
+                            await fetch('/admin/proxies', {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({ip, port, username:user, password:pass})});
+                            added++;
+                        }
+                    } else {
+                        await fetch('/admin/proxies', {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({ip, port, username:user, password:pass})});
+                        added++;
+                    }
+                }
+            }
+            document.getElementById('bulk-proxy-text').value = '';
+            refreshData();
+            showToast(`Processed ${added} IPs`);
+        }
+
         async function updatePassword() {
-            const new_password = document.getElementById('new-password').value; if(!new_password) return alert("Password required");
+            const new_password = document.getElementById('new-password').value; if(!new_password) return showToast("Password required", true);
             const res = await fetch('/admin/password', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ new_password }) });
-            if(res.ok) { alert("Password updated!"); hideModal('password-modal'); }
+            if(res.ok) { showToast("Password updated!"); hideModal('password-modal'); document.getElementById('new-password').value = ''; }
+        }
+
+        // Export & Import Data Logic
+        function exportData() {
+            const backup = {
+                keys: globalKeys.map(k => ({key: k.key, proxy_ip: globalProxies.find(p=>p.id===k.proxy_id)?.ip, proxy_port: globalProxies.find(p=>p.id===k.proxy_id)?.port})),
+                proxies: globalProxies.map(p => ({ip: p.ip, port: p.port, username: p.username, password: p.password})),
+                client_keys: globalClientKeys.map(k => ({name: k.name}))
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", "ciel_proxy_backup.json");
+            dlAnchorElem.click();
+            showToast("Backup Downloaded");
+        }
+
+        async function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    showToast("Restoring Backup...", false);
+                    
+                    // Restore Proxies
+                    if (data.proxies) {
+                        for(let p of data.proxies) {
+                            if(!globalProxies.find(ext => ext.ip === p.ip && ext.port === p.port)) {
+                                await fetch('/admin/proxies', {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify(p)});
+                            }
+                        }
+                    }
+                    await refreshData(); // refresh to get new proxy IDs
+                    
+                    // Restore Keys & Link Proxies
+                    if (data.keys) {
+                        for(let k of data.keys) {
+                            if(!globalKeys.find(ext => ext.key === k.key)) {
+                                await fetch('/admin/keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ key: k.key, priority: 0 }) });
+                            }
+                            if (k.proxy_ip) {
+                                const proxy = globalProxies.find(p => p.ip === k.proxy_ip && p.port === k.proxy_port);
+                                if (proxy) await setKeyProxy(k.key, proxy.id);
+                            }
+                        }
+                    }
+                    
+                    // Restore Client Keys
+                    if (data.client_keys) {
+                        for(let c of data.client_keys) {
+                            if(!globalClientKeys.find(ext => ext.name === c.name)) {
+                                await fetch('/admin/client-keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ name: c.name }) });
+                            }
+                        }
+                    }
+                    
+                    event.target.value = ''; // reset
+                    refreshAll();
+                    showToast("Restore Complete!");
+                } catch(err) {
+                    showToast("Invalid Backup File", true);
+                }
+            };
+            reader.readAsText(file);
         }
     </script>
 </body>
