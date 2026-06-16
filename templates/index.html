@@ -371,10 +371,14 @@
     <main class="w-full max-w-7xl mx-auto hidden opacity-0 transition-opacity duration-500" id="dashboard">
         
         <!-- Header -->
-        <header class="flex justify-between items-center mb-6 relative mt-1">
-            <div>
-                <h1 class="text-3xl md:text-5xl font-black tracking-tight text-white flex items-center gap-2">
-                    <svg viewBox="0 0 1000 1000" class="w-16 h-16 drop-shadow-[0_0_12px_rgba(0,255,157,0.5)]">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 relative mt-1 gap-4">
+            <div class="flex items-center gap-4 w-full md:w-auto">
+                <div class="text-left md:text-right flex-1">
+                    <p class="text-slate-300 text-lg md:text-2xl font-black tracking-widest uppercase" style="font-family: 'Courier New', Courier, monospace;">Intelligent Multi-Agent</p>
+                    <p class="text-[#00ffd6] text-sm md:text-base font-mono tracking-widest font-bold opacity-80">PROXY ROUTING SYSTEM</p>
+                </div>
+                <div class="w-20 h-20 md:w-28 md:h-28 flex-shrink-0">
+                    <svg viewBox="0 0 1000 1000" class="w-full h-full drop-shadow-[0_0_15px_rgba(0,255,157,0.6)]">
                         <defs>
                             <linearGradient id="grad-c-h" x1="0%" y1="0%" x2="0%" y2="100%">
                                 <stop offset="0%" stop-color="#ffffff" />
@@ -419,12 +423,18 @@
                                 <ellipse cx="0" cy="0" rx="48" ry="18" fill="none" opacity="0.5" transform="rotate(-30)" />
                             </g>
                         </g>
+                        <g>
+                            <g stroke="#ffffff" stroke-width="10" stroke-linecap="square" fill="none" class="animate-pulse-glow">
+                                <path d="M 435,685 L 395,685 L 395,725 L 435,725" />
+                                <path d="M 460,685 L 460,725" />
+                                <path d="M 485,685 L 525,685 M 485,705 L 515,705 M 485,725 L 525,725" />
+                                <path d="M 550,685 L 550,725 L 590,725" />
+                            </g>
+                        </g>
                     </svg>
-                    CIEL
-                </h1>
-                <p class="text-slate-400 mt-2 text-sm md:text-lg">Intelligent Multi-Agent Proxy</p>
+                </div>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-4 w-full md:w-auto justify-end">
                 <button onclick="refreshAll()" class="refresh-btn px-5 py-3 rounded-xl text-base font-bold flex items-center gap-2">
                     <svg class="w-5 h-5 refresh-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     <span class="hidden md:inline">Refresh</span>
