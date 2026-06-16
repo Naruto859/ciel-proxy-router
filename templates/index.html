@@ -371,7 +371,7 @@
     <main class="w-full max-w-7xl mx-auto hidden opacity-0 transition-opacity duration-500" id="dashboard">
         
         <!-- Header -->
-        <header class="flex justify-between items-center mb-6 relative mt-1 w-full overflow-hidden">
+        <header class="flex justify-between items-center mb-6 relative mt-1 w-full z-50">
             <div class="flex items-center gap-2 md:gap-4 flex-1">
                 <!-- Logo -->
                 <div class="w-16 h-16 md:w-20 md:h-20 flex-shrink-0">
@@ -395,25 +395,25 @@
                             </clipPath>
                         </defs>
                         <g class="opacity-70">
-                            <circle cx="500" cy="500" r="390" fill="none" stroke="#00ff9d" stroke-width="2" opacity="0.15" />
+                            <circle cx="500" cy="500" r="390" fill="none" stroke="#00ff9d" stroke-width="4" opacity="0.15" />
                             <g class="animate-spin-slow">
-                                <circle cx="500" cy="500" r="365" fill="none" stroke="#00ff9d" stroke-width="5" stroke-dasharray="400 350" opacity="0.7" />
+                                <circle cx="500" cy="500" r="365" fill="none" stroke="#00ff9d" stroke-width="10" stroke-dasharray="400 350" opacity="0.7" />
                             </g>
                             <g class="animate-spin-slow-reverse">
-                                <circle cx="500" cy="500" r="335" fill="none" stroke="#00ff9d" stroke-width="4.5" stroke-dasharray="30 80 150 60" opacity="0.6" />
+                                <circle cx="500" cy="500" r="335" fill="none" stroke="#00ff9d" stroke-width="9" stroke-dasharray="30 80 150 60" opacity="0.6" />
                             </g>
                         </g>
                         <g filter="url(#glow-light-h)">
-                            <path d="M 500,50 L 535,120 L 500,190 L 465,120 Z" fill="none" stroke="#00ff9d" stroke-width="2.5" />
+                            <path d="M 500,50 L 535,120 L 500,190 L 465,120 Z" fill="none" stroke="#00ff9d" stroke-width="5" />
                             <path d="M 500,90 L 515,120 L 500,150 L 485,120 Z" fill="#00ff9d" />
-                            <line x1="500" y1="20" x2="500" y2="50" stroke="#00ff9d" stroke-width="2.5" />
+                            <line x1="500" y1="20" x2="500" y2="50" stroke="#00ff9d" stroke-width="5" />
                             <circle cx="500" cy="20" r="5" fill="#00ff9d" class="animate-blink" />
                         </g>
                         <g class="animate-pulse-glow-strong">
                             <path d="M 490,340 L 450,340 A 150 150 0 0 0 450 640 L 490,640 L 490,570 L 450,570 A 80 80 0 0 1 450 410 L 490,410 Z" fill="url(#grad-c-h)" clip-path="url(#c-notches-h)" />
                             <path d="M 510,340 L 580,340 L 580,560 L 750,560 L 710,640 L 510,640 Z" fill="url(#grad-l-h)" filter="url(#glow-light-h)" />
                         </g>
-                        <g class="animate-globe-spin" stroke="#00ff9d" stroke-width="1.5" opacity="0.8">
+                        <g class="animate-globe-spin" stroke="#00ff9d" stroke-width="3" opacity="0.8">
                             <g transform="translate(430, 490)">
                                 <circle cx="0" cy="0" r="48" fill="none" opacity="0.6" />
                                 <ellipse cx="0" cy="0" rx="48" ry="18" fill="none" opacity="0.5" transform="rotate(30)" />
@@ -421,7 +421,7 @@
                             </g>
                         </g>
                         <g>
-                            <g stroke="#ffffff" stroke-width="10" stroke-linecap="square" fill="none" class="animate-pulse-glow">
+                            <g stroke="#ffffff" stroke-width="20" stroke-linecap="square" fill="none" class="animate-pulse-glow">
                                 <path d="M 435,685 L 395,685 L 395,725 L 435,725" />
                                 <path d="M 460,685 L 460,725" />
                                 <path d="M 485,685 L 525,685 M 485,705 L 515,705 M 485,725 L 525,725" />
