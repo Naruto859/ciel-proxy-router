@@ -234,6 +234,16 @@
 <body class="p-4 md:p-8 pt-2 md:pt-8">
     <div class="liquid-blob"></div>
     
+    <div id="loader-overlay" class="overlay hide" style="z-index: 100020 !important;">
+        <div class="glass-panel p-8 w-auto flex flex-col items-center justify-center">
+            <svg class="w-12 h-12 text-[#00ffd6] animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p id="loader-text" class="text-[#00ffd6] font-mono mt-4 font-bold tracking-widest text-sm">RESTORING...</p>
+        </div>
+    </div>
+
     <!-- Login Overlay -->
     <div id="login-overlay" class="overlay">
         <div class="glass-panel p-8 w-full max-w-md text-center mx-4">
@@ -952,7 +962,8 @@
             reader.onload = async function(e) {
                 try {
                     const data = JSON.parse(e.target.result);
-                    showToast("Restoring Backup...", false);
+                    document.getElementById('loader-text').innerText = "RESTORING BACKUP...";
+                    showModal('loader-overlay');
                     
                     // Restore Proxies
                     if (data.proxies) {
@@ -991,8 +1002,10 @@
                     
                     event.target.value = ''; // reset
                     refreshAll();
+                    hideModal('loader-overlay');
                     showToast("Restore Complete!");
                 } catch(err) {
+                    hideModal('loader-overlay');
                     showToast("Invalid Backup File", true);
                 }
             };

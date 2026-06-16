@@ -120,6 +120,13 @@ class DatabaseManager:
             await conn.execute("DELETE FROM keys WHERE key = ?", (key,))
             await conn.commit()
 
+    async def get_proxy_by_id(self, proxy_id: int):
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("SELECT * FROM proxies WHERE id = ?", (proxy_id,)) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+
     async def get_proxies(self):
         async with aiosqlite.connect(self.path) as conn:
             conn.row_factory = aiosqlite.Row
@@ -285,8 +292,8 @@ class KeyManager:
                 add_log(f"Balance check FAILED (HTTP {response.status_code}) for {key[:8]}... via {proxy_info}")
                 return -2.0, proxy_info
         except Exception as e:
-            logger.error(f"Balance check failed for {key[:10]}: {e}")
-        return -2.0, proxy_info
+            add_log(f"Balance check FAILED for {key[:8]}... via {proxy_info}: {str(e)}")
+            return -2.0, proxy_info
 
     async def force_pull_balances(self):
         async with balance_check_lock:
@@ -731,7 +738,7 @@ async def core_proxy(request: Request):
             return JSONResponse({"error": str(e)}, status_code=e.status_code)
         except Exception as e:
             error_details = str(e) if str(e) else repr(e)
-            add_log(f"Proxy attempt failed: {type(e).__name__} - {error_details}")
+            add_log(f"Proxy attempt ERROR via {proxy_info}: {type(e).__name__} - {error_details}")
             await asyncio.sleep(2); continue
 
     return JSONResponse({"error": "All keys exhausted or max hold duration reached"}, status_code=503)
