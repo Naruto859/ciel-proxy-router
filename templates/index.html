@@ -200,7 +200,7 @@
         .animate-globe-spin { animation: globe-spin 10s linear infinite; transform-origin: 430px 490px; }
         .animate-dash-flow { animation: dash-flow 4s linear infinite; }
         
-        /* Improved mobile scale fix to prevent UI cutoffs */
+        /* Extreme Mobile Performance Optimization & Scale Fix */
         @media (max-width: 768px) {
             body {
                 transform: scale(0.65);
@@ -208,6 +208,22 @@
                 width: 153.8vw;
                 height: 153.8vh;
                 overflow-x: hidden;
+            }
+            .liquid-blob {
+                display: none !important; /* Hide massive background animation to save GPU */
+            }
+            .glass-panel {
+                backdrop-filter: blur(10px); /* Reduce blur calculation cost */
+                -webkit-backdrop-filter: blur(10px);
+                background: rgba(15, 15, 25, 0.85); /* Slightly darker for contrast */
+            }
+            .card-3d {
+                box-shadow: 0 15px 25px -5px rgba(0,0,0,0.5) !important; /* Simple shadow */
+                transform: translateZ(0); /* Force hardware rendering */
+            }
+            .glass-inner {
+                backdrop-filter: none !important; /* Remove expensive nested blur */
+                -webkit-backdrop-filter: none !important;
             }
         }
     
