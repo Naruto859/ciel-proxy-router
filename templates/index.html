@@ -229,6 +229,7 @@
         .select-options.show { display: block; }
         .option-item { padding: 8px 12px; font-size: 0.75rem; cursor: pointer; color: white; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .option-item:hover { background: var(--accent); color: #000; }
+        .no-scroll { overflow: hidden !important; }
     </style>
 </head>
 <body class="p-4 md:p-8 pt-2 md:pt-8">
@@ -733,6 +734,7 @@
                 if (res.ok) {
                     const data = await res.json(); sessionToken = data.token; localStorage.setItem('ciel_session', sessionToken);
                     document.getElementById('login-overlay').classList.add('hide');
+                    document.body.classList.remove('no-scroll');
                     const dash = document.getElementById('dashboard'); dash.classList.remove('hidden');
                     setTimeout(() => dash.classList.remove('opacity-0'), 50);
                     refreshAll(); startLogPolling();
@@ -743,11 +745,13 @@
         function logout() { sessionToken = ''; localStorage.removeItem('ciel_session'); location.reload(); }
 
         window.onload = async () => {
+            document.body.classList.add('no-scroll');
             if (sessionToken) {
                 try {
                     const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
                     if (res.ok) {
                         document.getElementById('login-overlay').classList.add('hide');
+                        document.body.classList.remove('no-scroll');
                         const dash = document.getElementById('dashboard'); dash.classList.remove('hidden');
                         setTimeout(() => dash.classList.remove('opacity-0'), 50);
                         refreshAll(); startLogPolling();
@@ -963,6 +967,7 @@
                 try {
                     const data = JSON.parse(e.target.result);
                     document.getElementById('loader-text').innerText = "RESTORING BACKUP...";
+                    document.body.classList.add('no-scroll');
                     showModal('loader-overlay');
                     
                     // Restore Proxies
@@ -1003,9 +1008,11 @@
                     event.target.value = ''; // reset
                     refreshAll();
                     hideModal('loader-overlay');
+                    document.body.classList.remove('no-scroll');
                     showToast("Restore Complete!");
                 } catch(err) {
                     hideModal('loader-overlay');
+                    document.body.classList.remove('no-scroll');
                     showToast("Invalid Backup File", true);
                 }
             };
