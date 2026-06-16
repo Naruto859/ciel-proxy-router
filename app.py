@@ -357,9 +357,13 @@ async def list_keys():
 @app.post("/admin/keys", dependencies=[Depends(verify_admin_token)])
 async def add_key(req: Dict):
     await db.add_key(req['key'], req.get('priority', 0))
+    if req.get('proxy_id'):
+        await db.update_key_proxy(req['key'], req['proxy_id'])
+    
     keys = await db.get_keys()
     new_key_data = next((k for k in keys if k['key'] == req['key']), None)
-    if new_key_data: await key_manager.check_balance(new_key_data)
+    if new_key_data: 
+        await key_manager.check_balance(new_key_data)
     return {"success": True}
 
 @app.delete("/admin/keys/{key}", dependencies=[Depends(verify_admin_token)])

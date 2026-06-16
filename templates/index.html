@@ -967,12 +967,15 @@
                     // Restore Keys & Link Proxies
                     if (data.keys) {
                         for(let k of data.keys) {
-                            if(!globalKeys.find(ext => ext.key === k.key)) {
-                                await fetch('/admin/keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ key: k.key, priority: 0 }) });
-                            }
+                            let pid = null;
                             if (k.proxy_ip) {
                                 const proxy = globalProxies.find(p => p.ip === k.proxy_ip && p.port === k.proxy_port);
-                                if (proxy) await setKeyProxy(k.key, proxy.id);
+                                if (proxy) pid = proxy.id;
+                            }
+                            if(!globalKeys.find(ext => ext.key === k.key)) {
+                                await fetch('/admin/keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ key: k.key, priority: 0, proxy_id: pid }) });
+                            } else if (pid) {
+                                await setKeyProxy(k.key, pid);
                             }
                         }
                     }
