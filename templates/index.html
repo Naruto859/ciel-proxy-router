@@ -25,10 +25,10 @@
             position: fixed;
             width: 40vw;
             height: 40vw;
-            background: radial-gradient(circle, rgba(0,255,214,0.15) 0%, rgba(8,226,96,0) 70%);
+            /* Faked blur using gradient instead of expensive CSS filter */
+            background: radial-gradient(circle, rgba(0,255,214,0.1) 0%, rgba(0,255,214,0.05) 30%, rgba(8,226,96,0) 70%);
             border-radius: 50%;
             z-index: -1;
-            filter: blur(60px);
             animation: move 25s infinite alternate ease-in-out;
             will-change: transform;
             transform: translateZ(0);
@@ -39,12 +39,11 @@
             100% { transform: translate(120%, 80%) scale(0.8) translateZ(0); }
         }
         .glass-panel {
-            background: var(--glass);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            /* Faked glass effect to prevent tile-by-tile rendering lag */
+            background: rgba(25, 25, 35, 0.7);
             border: 1px solid var(--glass-border);
             border-radius: 24px;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
             will-change: transform, opacity;
             transform: translateZ(0);
         }
@@ -132,9 +131,8 @@
             z-index: 10;
         }
         .action-btn {
-            background: rgba(255,255,255,0.2);
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255,255,255,0.4);
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
             color: #0f172a;
             font-weight: bold;
             padding: 0.5rem 1rem;
@@ -142,28 +140,28 @@
             font-size: 0.8rem;
             transition: all 0.2s;
             cursor: pointer;
+            will-change: transform;
+            transform: translateZ(0);
         }
         .action-btn:hover {
-            background: rgba(255,255,255,0.4);
-            transform: scale(1.05);
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.05) translateZ(0);
         }
         @media (hover: hover) and (pointer: fine) {
             .parent-card:hover .card-3d {
-                transform: rotate3d(1, 1, 0, 15deg);
+                transform: rotate3d(1, 1, 0, 15deg) translateZ(0);
                 box-shadow: rgba(5, 71, 17, 0.3) 30px 50px 25px -40px, rgba(5, 71, 17, 0.1) 0px 25px 30px 0px;
             }
         }
 
-        .refresh-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; transition: all 0.3s; }
-        .refresh-btn:active .refresh-icon { transform: rotate(180deg); transition: transform 0.3s; }
+        .refresh-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; transition: all 0.3s; will-change: transform; transform: translateZ(0); }
+        .refresh-btn:active .refresh-icon { transform: rotate(180deg) translateZ(0); transition: transform 0.3s; }
         
         /* Fixed Overlays - Prevents scroll glitches */
         .overlay { 
             position: fixed !important; 
             inset: 0 !important; 
-            background: rgba(0, 0, 0, 0.85); 
-            backdrop-filter: blur(20px); 
-            -webkit-backdrop-filter: blur(20px);
+            background: rgba(5, 5, 10, 0.95); 
             z-index: 99999 !important; 
             display: flex; 
             align-items: center; 
@@ -200,7 +198,7 @@
         .animate-globe-spin { animation: globe-spin 10s linear infinite; transform-origin: 430px 490px; }
         .animate-dash-flow { animation: dash-flow 4s linear infinite; }
         
-        /* Extreme Mobile Performance Optimization & Scale Fix */
+        /* Improved mobile scale fix to prevent UI cutoffs */
         @media (max-width: 768px) {
             body {
                 transform: scale(0.65);
@@ -208,22 +206,6 @@
                 width: 153.8vw;
                 height: 153.8vh;
                 overflow-x: hidden;
-            }
-            .liquid-blob {
-                display: none !important; /* Hide massive background animation to save GPU */
-            }
-            .glass-panel {
-                backdrop-filter: blur(5px); /* Drastically reduce blur cost for mobile */
-                -webkit-backdrop-filter: blur(5px);
-                background: rgba(15, 15, 25, 0.9);
-            }
-            .card-3d {
-                box-shadow: 0 15px 25px -5px rgba(0,0,0,0.5) !important; /* Simple shadow */
-                transform: translateZ(0); /* Force hardware rendering */
-            }
-            .glass-inner {
-                backdrop-filter: none !important; /* Remove expensive nested blur */
-                -webkit-backdrop-filter: none !important;
             }
         }
     
