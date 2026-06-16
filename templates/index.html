@@ -30,11 +30,13 @@
             z-index: -1;
             filter: blur(60px);
             animation: move 25s infinite alternate ease-in-out;
+            will-change: transform;
+            transform: translateZ(0);
         }
         @keyframes move {
-            0% { transform: translate(-20%, -20%) scale(1); }
-            50% { transform: translate(50%, 50%) scale(1.2); }
-            100% { transform: translate(120%, 80%) scale(0.8); }
+            0% { transform: translate(-20%, -20%) scale(1) translateZ(0); }
+            50% { transform: translate(50%, 50%) scale(1.2) translateZ(0); }
+            100% { transform: translate(120%, 80%) scale(0.8) translateZ(0); }
         }
         .glass-panel {
             background: var(--glass);
@@ -43,6 +45,8 @@
             border: 1px solid var(--glass-border);
             border-radius: 24px;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            will-change: transform, opacity;
+            transform: translateZ(0);
         }
         
         /* 3D Card CSS */
@@ -53,6 +57,7 @@
             margin-bottom: 1rem;
             position: relative;
             z-index: 1;
+            will-change: transform;
         }
         @media (min-width: 768px) {
             .parent-card {
@@ -70,6 +75,8 @@
             box-shadow: rgba(5, 71, 17, 0) 40px 50px 25px -40px, rgba(5, 71, 17, 0.2) 0px 25px 25px -5px;
             position: relative;
             overflow: visible !important;
+            will-change: transform, box-shadow;
+            transform: translateZ(0);
         }
         .card-3d.dead {
             background: linear-gradient(135deg, rgb(255, 87, 87) 0%, rgb(180, 10, 10) 100%);
@@ -243,6 +250,19 @@
             </svg>
             <p id="loader-text" class="text-[#00ffd6] font-mono mt-4 font-bold tracking-widest text-sm">RESTORING...</p>
         </div>
+    </div>
+
+    <div id="initial-boot-loader" class="overlay flex-col" style="z-index: 100050 !important; background: #09090b;">
+        <svg viewBox="0 0 1000 1000" class="w-32 h-32 drop-shadow-[0_0_20px_rgba(0,255,157,0.4)] animate-pulse-glow">
+            <g class="animate-spin-slow">
+                <circle cx="500" cy="500" r="365" fill="none" stroke="#00ff9d" stroke-width="10" stroke-dasharray="400 350" opacity="0.7" />
+            </g>
+            <g class="animate-spin-slow-reverse">
+                <circle cx="500" cy="500" r="335" fill="none" stroke="#00ff9d" stroke-width="9" stroke-dasharray="30 80 150 60" opacity="0.6" />
+            </g>
+            <circle cx="500" cy="500" r="100" fill="#00ff9d" class="animate-blink" opacity="0.8"/>
+        </svg>
+        <p class="text-[#00ffd6] font-mono mt-8 font-bold tracking-widest text-lg animate-pulse">INITIALIZING CIEL KERNEL...</p>
     </div>
 
     <!-- Login Overlay -->
@@ -763,13 +783,22 @@
                 try {
                     const res = await fetch('/admin/live_status', { headers: { 'Authorization': `Bearer ${sessionToken}` }});
                     if (res.ok) {
+                        document.getElementById('initial-boot-loader').classList.add('hide');
                         document.getElementById('login-overlay').classList.add('hide');
                         document.body.classList.remove('no-scroll');
                         const dash = document.getElementById('dashboard'); dash.classList.remove('hidden');
                         setTimeout(() => dash.classList.remove('opacity-0'), 50);
                         refreshAll(); startLogPolling();
-                    } else { logout(); }
-                } catch(e) { logout(); }
+                    } else { 
+                        document.getElementById('initial-boot-loader').classList.add('hide');
+                        logout(); 
+                    }
+                } catch(e) { 
+                    document.getElementById('initial-boot-loader').classList.add('hide');
+                    logout(); 
+                }
+            } else {
+                setTimeout(() => { document.getElementById('initial-boot-loader').classList.add('hide'); }, 1000);
             }
         };
 
@@ -807,7 +836,7 @@
                 
                 const gridP = document.getElementById('proxies-grid'); gridP.innerHTML = '';
                 globalProxies.forEach(p => { 
-                    gridP.innerHTML += `<div class="parent-card !h-[240px] md:!h-[280px] w-full"><div class="card-3d normal"><div class="glass-inner"></div><div class="content-3d"><span class="title truncate" style="color:#022c22; font-family:monospace; font-size:1rem;">${p.ip}</span><p style="font-size:10px; color:rgba(2,44,34,0.6); margin-top:2px; font-weight:900">PORT: ${p.port}</p><div class="flex gap-2 mt-2"><button onclick="event.stopPropagation(); showEditProxyModal(${p.id})" class="text-[10px] bg-white/30 text-[#022c22] px-2 py-1 rounded shadow hover:bg-white/50">Edit User/Pass</button></div><div id="ps-${p.id}" class="mt-2 text-[10px] font-mono font-bold hidden truncate"></div></div><div class="bottom-3d"><button onclick="testProxy(${p.id})" class="action-btn !text-xs px-2 py-1">Test</button><button onclick="deleteProxy(${p.id})" class="action-btn !bg-black/10 !border-transparent !text-xs px-2 py-1">Remove</button></div></div></div>`; 
+                    gridP.innerHTML += `<div class="parent-card !h-[240px] md:!h-[280px] w-full"><div class="card-3d normal"><div class="glass-inner"></div><div class="content-3d"><span class="title truncate" style="color:#022c22; font-family:monospace; font-size:1rem;">${p.ip}</span><p style="font-size:10px; color:rgba(2,44,34,0.6); margin-top:2px; font-weight:900">PORT: ${p.port}</p><div class="flex gap-2 mt-2"><button style="pointer-events: auto;" onclick="event.stopPropagation(); showEditProxyModal(${p.id})" class="text-[10px] bg-white/30 text-[#022c22] px-2 py-1 rounded shadow hover:bg-white/50">Edit User/Pass</button></div><div id="ps-${p.id}" class="mt-2 text-[10px] font-mono font-bold hidden truncate"></div></div><div class="bottom-3d"><button onclick="testProxy(${p.id})" class="action-btn !text-xs px-2 py-1">Test</button><button onclick="deleteProxy(${p.id})" class="action-btn !bg-black/10 !border-transparent !text-xs px-2 py-1">Remove</button></div></div></div>`; 
                 });
                 
                 document.getElementById('stat-total-pollen').innerText = globalKeys.reduce((a,b)=>a+(b.balance>0?b.balance:0),0).toFixed(4);
