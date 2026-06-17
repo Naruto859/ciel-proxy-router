@@ -627,6 +627,14 @@
                 <div><p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Polling Interval (Seconds)</p><input id="poll-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none"></div>
                 <div><p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Force Check Interval (Seconds)</p><input id="force-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none"></div>
                 <div><p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Max Hold Duration (Seconds)</p><input id="hold-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none"></div>
+                
+                <div class="flex items-center justify-between bg-white/5 p-3 rounded-xl">
+                    <span class="text-xs font-bold text-white uppercase">Auto-Heal Proxies</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="auto-heal-check" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00ffd6]"></div>
+                    </label>
+                </div>
             </div>
             <div class="flex gap-3 mt-6"><button onclick="hideModal('modal-polling')" class="flex-1 p-3 rounded-xl bg-white/5 font-bold">Cancel</button><button onclick="savePolling()" class="flex-1 p-3 rounded-xl btn-primary">Update</button></div>
         </div>
@@ -834,7 +842,8 @@
                 
                 const gridP = document.getElementById('proxies-grid'); gridP.innerHTML = '';
                 globalProxies.forEach(p => { 
-                    gridP.innerHTML += `<div class="parent-card !h-[240px] md:!h-[280px] w-full"><div class="card-3d normal"><div class="glass-inner"></div><div class="content-3d"><span class="title truncate" style="color:#022c22; font-family:monospace; font-size:1rem;">${p.ip}</span><p style="font-size:10px; color:rgba(2,44,34,0.6); margin-top:2px; font-weight:900">PORT: ${p.port}</p><div class="flex gap-2 mt-2" style="pointer-events: auto;"><button onclick="event.stopPropagation(); showEditProxyModal(${p.id})" class="text-[10px] bg-white/30 text-[#022c22] px-2 py-1 rounded shadow hover:bg-white/50">Edit User/Pass</button></div><div id="ps-${p.id}" class="mt-2 text-[10px] font-mono font-bold hidden truncate"></div></div><div class="bottom-3d"><button onclick="testProxy(${p.id})" class="action-btn !text-xs px-2 py-1">Test</button><button onclick="deleteProxy(${p.id})" class="action-btn !bg-black/10 !border-transparent !text-xs px-2 py-1">Remove</button></div></div></div>`; 
+                    const isFailed = p.status === 'failed';
+                    gridP.innerHTML += `<div class="parent-card !h-[240px] md:!h-[280px] w-full"><div class="card-3d ${isFailed?'dead':'normal'}"><div class="glass-inner"></div><div class="content-3d"><span class="title truncate" style="color:${isFailed?'white':'#022c22'}; font-family:monospace; font-size:1rem;">${p.ip}</span><p style="font-size:10px; color:${isFailed?'rgba(255,255,255,0.6)':'rgba(2,44,34,0.6)'}; margin-top:2px; font-weight:900">PORT: ${p.port}</p><div class="flex gap-2 mt-2" style="pointer-events: auto;"><button onclick="event.stopPropagation(); showEditProxyModal(${p.id})" class="text-[10px] ${isFailed?'bg-black/20 text-white':'bg-white/30 text-[#022c22]'} px-2 py-1 rounded shadow hover:bg-white/50">Edit User/Pass</button></div><div id="ps-${p.id}" class="mt-2 text-[10px] font-mono font-bold hidden truncate"></div></div><div class="bottom-3d"><button onclick="testProxy(${p.id})" class="action-btn !text-xs px-2 py-1" style="${isFailed?'color:white; border-color:white;':''}">Test</button><button onclick="deleteProxy(${p.id})" class="action-btn !bg-black/10 !border-transparent !text-xs px-2 py-1" style="${isFailed?'color:white;':''}">Remove</button></div></div></div>`; 
                 });
                 
                 document.getElementById('stat-total-pollen').innerText = globalKeys.reduce((a,b)=>a+(b.balance>0?b.balance:0),0).toFixed(4);
@@ -886,25 +895,32 @@
         async function testKey(k) { showToast('Verifying...'); try { const res=await fetch('/admin/test/'+k,{headers:{'Authorization':`Bearer ${sessionToken}`}}); const d=await res.json(); document.getElementById('v-ip').innerText=d.ip||'VPS IP (Direct)'; document.getElementById('v-bal').innerText=(d.balance>0?d.balance:0).toFixed(4)+' P'; document.getElementById('v-status').innerHTML=d.success?'<span style="color:#00ffd6">VERIFIED</span>':'<span style="color:#ff5757">FAILED</span>'; showModal('modal-verify'); refreshData(); } catch(e){showToast('Error',true);} }
         
         async function showPollingModal() {
-            const [resP, resF, resH] = await Promise.all([
+            const [resP, resF, resH, resA] = await Promise.all([
                 fetch('/admin/settings/polling', {headers:{'Authorization':`Bearer ${sessionToken}`}}),
                 fetch('/admin/settings/force_check', {headers:{'Authorization':`Bearer ${sessionToken}`}}),
-                fetch('/admin/settings/max_hold', {headers:{'Authorization':`Bearer ${sessionToken}`}})
+                fetch('/admin/settings/max_hold', {headers:{'Authorization':`Bearer ${sessionToken}`}}),
+                fetch('/admin/settings/auto_heal', {headers:{'Authorization':`Bearer ${sessionToken}`}})
             ]);
-            if(resP.ok && resF.ok && resH.ok) {
+            if(resP.ok && resF.ok && resH.ok && resA.ok) {
                 document.getElementById('poll-sec').value = (await resP.json()).interval;
                 document.getElementById('force-sec').value = (await resF.json()).interval;
                 document.getElementById('hold-sec').value = (await resH.json()).duration;
+                document.getElementById('auto-heal-check').checked = (await resA.json()).enabled;
                 showModal('modal-polling');
             }
         }
         
         async function savePolling() {
-            const poll = parseInt(document.getElementById('poll-sec').value); const force = parseInt(document.getElementById('force-sec').value); const hold = parseInt(document.getElementById('hold-sec').value);
+            const poll = parseInt(document.getElementById('poll-sec').value); 
+            const force = parseInt(document.getElementById('force-sec').value); 
+            const hold = parseInt(document.getElementById('hold-sec').value);
+            const autoHeal = document.getElementById('auto-heal-check').checked;
+            
             await Promise.all([
                 fetch('/admin/settings/polling',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({interval:poll})}),
                 fetch('/admin/settings/force_check',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({interval:force})}),
-                fetch('/admin/settings/max_hold',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({duration:hold})})
+                fetch('/admin/settings/max_hold',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({duration:hold})}),
+                fetch('/admin/settings/auto_heal',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({enabled:autoHeal})})
             ]);
             hideModal('modal-polling'); showToast('Kernel Settings Updated');
         }
@@ -944,13 +960,13 @@
         async function processBulkProxies() {
             const text = document.getElementById('bulk-proxy-text').value.trim();
             if(!text) return showToast('Input is empty', true);
-            const overwrite = document.getElementById('bulk-overwrite-pass').checked;
+            
+            document.getElementById('loader-text').innerText = "INJECTING NODES...";
+            showModal('loader-overlay');
+            hideModal('modal-bulk-proxy');
             
             const lines = text.split('\n');
             let added = 0;
-            
-            showToast('Processing...');
-            hideModal('modal-bulk-proxy');
             
             for(let line of lines) {
                 line = line.trim(); if(!line) continue;
@@ -960,21 +976,13 @@
                     const user = parts.length >= 3 ? parts[2] : "";
                     const pass = parts.length >= 4 ? parts[3] : "";
                     
-                    const existing = globalProxies.find(p => p.ip === ip && p.port === port);
-                    if (existing) {
-                        if (overwrite) {
-                            await fetch('/admin/proxies/'+existing.id, {method:'DELETE',headers:{'Authorization':`Bearer ${sessionToken}`}});
-                            await fetch('/admin/proxies', {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({ip, port, username:user, password:pass})});
-                            added++;
-                        }
-                    } else {
-                        await fetch('/admin/proxies', {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({ip, port, username:user, password:pass})});
-                        added++;
-                    }
+                    await fetch('/admin/proxies', {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({ip, port, username:user, password:pass})});
+                    added++;
                 }
             }
             document.getElementById('bulk-proxy-text').value = '';
-            refreshData();
+            await refreshData();
+            hideModal('loader-overlay');
             showToast(`Processed ${added} IPs`);
         }
 

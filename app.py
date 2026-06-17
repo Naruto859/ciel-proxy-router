@@ -52,7 +52,9 @@ class DatabaseManager:
                     is_active INTEGER DEFAULT 1,
                     last_checked TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     proxy_id INTEGER,
-                    FOREIGN KEY (proxy_id) REFERENCES proxies (id)
+                    home_proxy_id INTEGER,
+                    FOREIGN KEY (proxy_id) REFERENCES proxies (id),
+                    FOREIGN KEY (home_proxy_id) REFERENCES proxies (id)
                 )
             """)
             await conn.execute("""
@@ -62,8 +64,19 @@ class DatabaseManager:
                     port INTEGER,
                     username TEXT,
                     password TEXT,
+                    status TEXT DEFAULT 'operational',
                     is_active INTEGER DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS proxy_credentials (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    proxy_id INTEGER,
+                    username TEXT,
+                    password TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    FOREIGN KEY (proxy_id) REFERENCES proxies (id)
                 )
             """)
             await conn.execute("""
@@ -86,6 +99,7 @@ class DatabaseManager:
             await conn.execute("INSERT OR IGNORE INTO settings VALUES ('polling_interval', '300')")
             await conn.execute("INSERT OR IGNORE INTO settings VALUES ('force_check_interval', '300')")
             await conn.execute("INSERT OR IGNORE INTO settings VALUES ('max_hold_duration', '7200')")
+            await conn.execute("INSERT OR IGNORE INTO settings VALUES ('auto_heal_enabled', '0')")
             
             # Default password
             default_pwd = "Samirandas123@"
@@ -105,9 +119,12 @@ class DatabaseManager:
             await conn.execute("INSERT OR REPLACE INTO keys (key, priority) VALUES (?, ?)", (key, priority))
             await conn.commit()
 
-    async def update_key_proxy(self, key: str, proxy_id: Optional[int]):
+    async def update_key_proxy(self, key: str, proxy_id: Optional[int], is_home: bool = False):
         async with aiosqlite.connect(self.path) as conn:
-            await conn.execute("UPDATE keys SET proxy_id = ? WHERE key = ?", (proxy_id, key))
+            if is_home:
+                await conn.execute("UPDATE keys SET proxy_id = ?, home_proxy_id = ? WHERE key = ?", (proxy_id, proxy_id, key))
+            else:
+                await conn.execute("UPDATE keys SET proxy_id = ? WHERE key = ?", (proxy_id, key))
             await conn.commit()
 
     async def update_balance(self, key: str, balance: float):
@@ -134,17 +151,63 @@ class DatabaseManager:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
 
-    async def get_proxy_by_id(self, proxy_id: int):
+    async def get_proxy_credentials(self, proxy_id: int):
         async with aiosqlite.connect(self.path) as conn:
             conn.row_factory = aiosqlite.Row
-            async with conn.execute("SELECT * FROM proxies WHERE id = ?", (proxy_id,)) as cursor:
-                row = await cursor.fetchone()
-                return dict(row) if row else None
+            async with conn.execute("SELECT * FROM proxy_credentials WHERE proxy_id = ? AND is_active = 1", (proxy_id,)) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def update_proxy_status(self, proxy_id: int, status: str):
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("UPDATE proxies SET status = ? WHERE id = ?", (status, proxy_id))
+            await conn.commit()
 
     async def add_proxy(self, ip: str, port: int, username: Optional[str] = None, password: Optional[str] = None):
         async with aiosqlite.connect(self.path) as conn:
-            await conn.execute("INSERT INTO proxies (ip, port, username, password) VALUES (?, ?, ?, ?)", (ip, port, username, password))
+            # Check if IP:PORT already exists
+            async with conn.execute("SELECT id, username, password FROM proxies WHERE ip = ? AND port = ?", (ip, port)) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    proxy_id = row[0]
+                    # If existing credentials differ, add to pool
+                    if username and password and (row[1] != username or row[2] != password):
+                        await conn.execute("INSERT OR IGNORE INTO proxy_credentials (proxy_id, username, password) VALUES (?, ?, ?)", (proxy_id, username, password))
+                    # Update main credentials to latest
+                    await conn.execute("UPDATE proxies SET username = ?, password = ?, status = 'operational' WHERE id = ?", (username, password, proxy_id))
+                else:
+                    await conn.execute("INSERT INTO proxies (ip, port, username, password) VALUES (?, ?, ?, ?)", (ip, port, username, password))
             await conn.commit()
+
+    async def get_auto_heal_enabled(self) -> bool:
+        async with aiosqlite.connect(self.path) as conn:
+            async with conn.execute("SELECT value FROM settings WHERE name = 'auto_heal_enabled'") as cursor:
+                row = await cursor.fetchone()
+                return row[0] == '1' if row else False
+
+    async def set_auto_heal_enabled(self, enabled: bool):
+        val = '1' if enabled else '0'
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute("UPDATE settings SET value = ? WHERE name = 'auto_heal_enabled'", (val,))
+            await conn.commit()
+
+    async def get_healthy_proxy_for_key(self, key_to_exclude: str) -> Optional[int]:
+        """Finds a healthy proxy with the least number of keys assigned to it."""
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            # Join proxies with a count of keys currently assigned to them
+            query = """
+                SELECT p.id, COUNT(k.key) as key_count 
+                FROM proxies p 
+                LEFT JOIN keys k ON p.id = k.proxy_id 
+                WHERE p.status = 'operational' AND p.is_active = 1
+                GROUP BY p.id 
+                ORDER BY key_count ASC, p.created_at DESC 
+                LIMIT 1
+            """
+            async with conn.execute(query) as cursor:
+                row = await cursor.fetchone()
+                return row['id'] if row else None
 
     async def delete_proxy(self, proxy_id: int):
         async with aiosqlite.connect(self.path) as conn:
@@ -272,28 +335,79 @@ class KeyManager:
         key = key_data['key']
         proxy_id = key_data.get('proxy_id')
         proxy_info = "VPS IP (Direct)"
+        
         try:
             client = proxy_manager.default_client
-            if proxy_id:
-                proxy = await db.get_proxy_by_id(proxy_id)
-                if proxy:
-                    client = await proxy_manager.get_client_for_proxy(proxy)
-                    proxy_info = proxy['ip']
+            active_proxy = None
             
-            headers = {"Authorization": f"Bearer {key}", "User-Agent": "curl/8.5.0"}
-            response = await client.get(f"{BASE_URL}/account/balance", headers=headers, timeout=10.0)
-            if response.status_code == 200:
-                balance = response.json().get("balance", 0.0)
-                await db.update_balance(key, balance)
-                add_log(f"Balance check SUCCESS for {key[:8]}... via {proxy_info}: {balance}")
-                return balance, proxy_info
+            if proxy_id:
+                active_proxy = await db.get_proxy_by_id(proxy_id)
+                if active_proxy:
+                    # Gather all credentials to try (Main + Pool)
+                    creds_to_try = [{"username": active_proxy['username'], "password": active_proxy['password']}]
+                    pool = await db.get_proxy_credentials(proxy_id)
+                    creds_to_try.extend(pool)
+                    
+                    working_client = None
+                    for cred in creds_to_try:
+                        try:
+                            # Construct a temporary proxy dict to get a client
+                            temp_p = {**active_proxy, "username": cred['username'], "password": cred['password']}
+                            client_attempt = await proxy_manager.get_client_for_proxy(temp_p)
+                            
+                            headers = {"Authorization": f"Bearer {key}", "User-Agent": "curl/8.5.0"}
+                            response = await client_attempt.get(f"{BASE_URL}/account/balance", headers=headers, timeout=10.0)
+                            
+                            if response.status_code == 200:
+                                # Success! Found working credentials for this IP
+                                working_client = client_attempt
+                                proxy_info = active_proxy['ip']
+                                
+                                # If this was a pool credential, update the main one
+                                if cred.get('id'): # id exists only for pool items
+                                    await db.add_proxy(active_proxy['ip'], active_proxy['port'], cred['username'], cred['password'])
+                                
+                                await db.update_proxy_status(proxy_id, 'operational')
+                                balance = response.json().get("balance", 0.0)
+                                await db.update_balance(key, balance)
+                                add_log(f"Balance check SUCCESS for {key[:8]}... via {proxy_info}: {balance}")
+                                return balance, proxy_info
+                            
+                            elif response.status_code == 402: # Out of balance is a key issue, not proxy issue
+                                await db.update_balance(key, 0.0)
+                                return 0.0, active_proxy['ip']
+                        
+                        except Exception:
+                            continue # Try next credentials in pool
+                    
+                    # If we reached here, NO credentials worked for this proxy
+                    proxy_info = active_proxy['ip']
+                    await db.update_proxy_status(proxy_id, 'failed')
+                    add_log(f"Proxy {proxy_info} CRITICAL FAILURE: All credentials failed.")
+                    
+                    # AUTO-HEAL LOGIC
+                    if await db.get_auto_heal_enabled():
+                        new_pid = await db.get_healthy_proxy_for_key(key)
+                        if new_pid:
+                            new_proxy = await db.get_proxy_by_id(new_pid)
+                            await db.update_key_proxy(key, new_pid)
+                            add_log(f"AUTO-HEAL: Shifted key {key[:8]} from RED proxy {proxy_info} to GREEN proxy {new_proxy['ip']}")
+                            # Recurse once with new proxy
+                            return await self.check_balance({**key_data, "proxy_id": new_pid})
+
             else:
-                await db.update_balance(key, 0.0)
-                add_log(f"Balance check FAILED (HTTP {response.status_code}) for {key[:8]}... via {proxy_info}")
-                return -2.0, proxy_info
+                # Direct VPS check
+                headers = {"Authorization": f"Bearer {key}", "User-Agent": "curl/8.5.0"}
+                response = await client.get(f"{BASE_URL}/account/balance", headers=headers, timeout=10.0)
+                if response.status_code == 200:
+                    balance = response.json().get("balance", 0.0)
+                    await db.update_balance(key, balance)
+                    return balance, "VPS IP (Direct)"
+                
         except Exception as e:
             add_log(f"Balance check FAILED for {key[:8]}... via {proxy_info}: {str(e)}")
-            return -2.0, proxy_info
+            
+        return -2.0, proxy_info
 
     async def force_pull_balances(self):
         async with balance_check_lock:
@@ -324,14 +438,50 @@ async def log_cleanup_worker():
         system_logs.clear()
         add_log("System logs automatically cleared (5h rotation).")
 
+async def auto_heal_worker():
+    """Runs every 24 hours to re-test RED proxies and revert keys to Home IPs if recovered."""
+    while True:
+        try:
+            await asyncio.sleep(24 * 3600)
+            if not await db.get_auto_heal_enabled(): continue
+            
+            add_log("CRON: Starting 24h Auto-Heal & Revert cycle...")
+            proxies = await db.get_proxies()
+            failed_proxies = [p for p in proxies if p['status'] == 'failed']
+            
+            if failed_proxies:
+                # Re-test failed proxies using a dummy key (first active key)
+                keys = await db.get_keys()
+                if not keys: continue
+                dummy_key = keys[0]
+                
+                for fp in failed_proxies:
+                    # check_balance will automatically try all credentials and update status
+                    await key_manager.check_balance({**dummy_key, "proxy_id": fp['id']})
+            
+            # Revert keys to Home Proxy if recovered
+            all_keys = await db.get_keys()
+            for k in all_keys:
+                if k.get('home_proxy_id') and k['proxy_id'] != k['home_proxy_id']:
+                    home_p = await db.get_proxy_by_id(k['home_proxy_id'])
+                    if home_p and home_p['status'] == 'operational':
+                        await db.update_key_proxy(k['key'], k['home_proxy_id'])
+                        add_log(f"CRON: Reverted key {k['key'][:8]} to original Home Proxy {home_p['ip']}")
+                        
+            add_log("CRON: Auto-Heal cycle complete.")
+        except Exception as e:
+            logger.error(f"Auto-heal worker error: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db._init_db()
     worker = asyncio.create_task(polling_worker())
     cleanup = asyncio.create_task(log_cleanup_worker())
+    cron = asyncio.create_task(auto_heal_worker())
     yield
     worker.cancel()
     cleanup.cancel()
+    cron.cancel()
     await proxy_manager.close_all()
 
 app = FastAPI(lifespan=lifespan)
@@ -388,7 +538,7 @@ async def test_key(key: str):
 
 @app.post("/admin/keys/proxy", dependencies=[Depends(verify_admin_token)])
 async def update_key_proxy(req: Dict):
-    await db.update_key_proxy(req['key'], req['proxy_id'])
+    await db.update_key_proxy(req['key'], req['proxy_id'], is_home=True)
     return {"success": True}
 
 @app.get("/admin/proxies", dependencies=[Depends(verify_admin_token)])
@@ -457,6 +607,15 @@ async def get_max_hold():
 @app.post("/admin/settings/max_hold", dependencies=[Depends(verify_admin_token)])
 async def set_max_hold(req: Dict):
     await db.set_max_hold_duration(int(req['duration']))
+    return {"success": True}
+
+@app.get("/admin/settings/auto_heal", dependencies=[Depends(verify_admin_token)])
+async def get_auto_heal():
+    return {"enabled": await db.get_auto_heal_enabled()}
+
+@app.post("/admin/settings/auto_heal", dependencies=[Depends(verify_admin_token)])
+async def set_auto_heal(req: Dict):
+    await db.set_auto_heal_enabled(req['enabled'])
     return {"success": True}
 
 
