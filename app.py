@@ -204,21 +204,28 @@ class DatabaseManager:
             await conn.execute("UPDATE proxies SET status = ? WHERE id = ?", (status, proxy_id))
             await conn.commit()
 
-    async def add_proxy(self, ip: str, port: int, username: Optional[str] = None, password: Optional[str] = None):
+    async def add_proxy(self, ip: str, port: int, username: Optional[str] = None, password: Optional[str] = None) -> tuple[int, bool]:
         async with aiosqlite.connect(self.path) as conn:
-            # Check if IP:PORT already exists
-            async with conn.execute("SELECT id, username, password FROM proxies WHERE ip = ? AND port = ?", (ip, port)) as cursor:
+            # Match strictly by IP Address only
+            async with conn.execute("SELECT id, username, password, port FROM proxies WHERE ip = ?", (ip,)) as cursor:
                 row = await cursor.fetchone()
                 if row:
                     proxy_id = row[0]
-                    # If existing credentials differ, add to pool
-                    if username and password and (row[1] != username or row[2] != password):
-                        await conn.execute("INSERT OR IGNORE INTO proxy_credentials (proxy_id, username, password) VALUES (?, ?, ?)", (proxy_id, username, password))
-                    # Update main credentials to latest
-                    await conn.execute("UPDATE proxies SET username = ?, password = ?, status = 'operational' WHERE id = ?", (username, password, proxy_id))
+                    old_user, old_pass, old_port = row[1], row[2], row[3]
+                    
+                    # If existing credentials/port differ, save the old ones to the pool before overwriting
+                    if old_user and old_pass and (old_user != username or old_pass != password or old_port != port):
+                        await conn.execute("INSERT OR IGNORE INTO proxy_credentials (proxy_id, username, password) VALUES (?, ?, ?)", (proxy_id, old_user, old_pass))
+                    
+                    # Force update the proxy to the latest Port, Username, and Password, and reset status to operational
+                    await conn.execute("UPDATE proxies SET port = ?, username = ?, password = ?, status = 'operational' WHERE id = ?", (port, username, password, proxy_id))
+                    is_new = False
                 else:
-                    await conn.execute("INSERT INTO proxies (ip, port, username, password) VALUES (?, ?, ?, ?)", (ip, port, username, password))
+                    cursor = await conn.execute("INSERT INTO proxies (ip, port, username, password) VALUES (?, ?, ?, ?)", (ip, port, username, password))
+                    proxy_id = cursor.lastrowid
+                    is_new = True
             await conn.commit()
+            return proxy_id, is_new
 
     async def get_auto_heal_enabled(self) -> bool:
         async with aiosqlite.connect(self.path) as conn:
@@ -614,6 +621,44 @@ async def list_proxies():
 async def add_proxy(req: Dict):
     await db.add_proxy(req['ip'], req['port'], req.get('username'), req.get('password'))
     return {"success": True}
+
+@app.post("/admin/proxies/bulk", dependencies=[Depends(verify_admin_token)])
+async def bulk_add_proxies(req: Dict):
+    proxies_to_add = req.get('proxies', [])
+    auto_assign = req.get('auto_assign', False)
+    
+    added_count = 0
+    for p in proxies_to_add:
+        # 1. Add or Update proxy in DB
+        proxy_id, is_new = await db.add_proxy(p['ip'], p['port'], p.get('username'), p.get('password'))
+        added_count += 1
+        
+        # 2. Test proxy immediately to mark as RED if dead
+        proxy_data = await db.get_proxy_by_id(proxy_id)
+        if proxy_data:
+            try:
+                client = await proxy_manager.get_client_for_proxy(proxy_data)
+                resp = await client.get("https://api.ipify.org?format=json", timeout=10.0)
+                if resp.status_code == 200:
+                    await db.update_proxy_status(proxy_id, 'operational')
+                else:
+                    await db.update_proxy_status(proxy_id, 'failed')
+            except Exception:
+                await db.update_proxy_status(proxy_id, 'failed')
+                
+        # 3. Auto-Assign logic if enabled and proxy is healthy
+        if auto_assign and is_new:
+            # Find an API key that doesn't have a proxy_id yet
+            keys = await db.get_keys()
+            free_key = next((k for k in keys if not k.get('proxy_id')), None)
+            if free_key:
+                # Check if proxy is operational before assigning
+                final_proxy_data = await db.get_proxy_by_id(proxy_id)
+                if final_proxy_data and final_proxy_data['status'] == 'operational':
+                    await db.update_key_proxy(free_key['key'], proxy_id, is_home=True)
+                    add_log(f"AUTO-ASSIGN: Dedicated new IP {p['ip']} to key {free_key['key'][:8]}")
+
+    return {"success": True, "added": added_count}
 
 @app.delete("/admin/proxies/{proxy_id}", dependencies=[Depends(verify_admin_token)])
 async def delete_proxy(proxy_id: int):

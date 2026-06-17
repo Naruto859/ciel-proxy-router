@@ -614,9 +614,9 @@
                 
                 <div class="bg-purple-900/30 border border-purple-500/30 p-3 rounded-xl mt-2">
                     <p class="text-xs text-purple-300 font-bold mb-2">Options:</p>
-                    <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                        <input type="checkbox" id="bulk-overwrite-pass" class="rounded bg-black/50 border-white/10 text-purple-500">
-                        Update Password/User for existing IPs
+                    <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer mb-2">
+                        <input type="checkbox" id="bulk-auto-assign" class="rounded bg-black/50 border-white/10 text-purple-500">
+                        Auto-Assign to Free Keys
                     </label>
                 </div>
 
@@ -988,13 +988,14 @@
         async function processBulkProxies() {
             const text = document.getElementById('bulk-proxy-text').value.trim();
             if(!text) return showToast('Input is empty', true);
+            const autoAssign = document.getElementById('bulk-auto-assign').checked;
             
             document.getElementById('loader-text').innerText = "INJECTING NODES...";
             showModal('loader-overlay');
             hideModal('modal-bulk-proxy');
             
             const lines = text.split('\n');
-            let added = 0;
+            const proxies_list = [];
             
             for(let line of lines) {
                 line = line.trim(); if(!line) continue;
@@ -1003,15 +1004,21 @@
                     const ip = parts[0]; const port = parseInt(parts[1]);
                     const user = parts.length >= 3 ? parts[2] : "";
                     const pass = parts.length >= 4 ? parts[3] : "";
-                    
-                    await fetch('/admin/proxies', {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({ip, port, username:user, password:pass})});
-                    added++;
+                    proxies_list.push({ip, port, username:user, password:pass});
                 }
             }
+            
+            const res = await fetch('/admin/proxies/bulk', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}`},
+                body: JSON.stringify({proxies: proxies_list, auto_assign: autoAssign})
+            });
+            const data = await res.json();
+            
             document.getElementById('bulk-proxy-text').value = '';
             await refreshData();
             hideModal('loader-overlay');
-            showToast(`Processed ${added} IPs`);
+            showToast(`Processed ${data.added || 0} IPs`);
         }
 
         async function updatePassword() {
@@ -1023,7 +1030,7 @@
         // Export & Import Data Logic
         function exportData() {
             const backup = {
-                keys: globalKeys.map(k => ({key: k.key, proxy_ip: globalProxies.find(p=>p.id===k.proxy_id)?.ip, proxy_port: globalProxies.find(p=>p.id===k.proxy_id)?.port})),
+                keys: globalKeys.map(k => ({key: k.key, proxy_ip: globalProxies.find(p=>p.id===k.home_proxy_id)?.ip, proxy_port: globalProxies.find(p=>p.id===k.home_proxy_id)?.port})),
                 proxies: globalProxies.map(p => ({ip: p.ip, port: p.port, username: p.username, password: p.password})),
                 client_keys: globalClientKeys.map(k => ({name: k.name}))
             };
