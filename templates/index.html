@@ -25,7 +25,6 @@
             position: fixed;
             width: 40vw;
             height: 40vw;
-            /* Faked blur using gradient instead of expensive CSS filter */
             background: radial-gradient(circle, rgba(0,255,214,0.1) 0%, rgba(0,255,214,0.05) 30%, rgba(8,226,96,0) 70%);
             border-radius: 50%;
             z-index: -1;
@@ -39,7 +38,6 @@
             100% { transform: translate(120%, 80%) scale(0.8) translateZ(0); }
         }
         .glass-panel {
-            /* Faked glass effect to prevent tile-by-tile rendering lag */
             background: rgba(25, 25, 35, 0.7);
             border: 1px solid var(--glass-border);
             border-radius: 24px;
@@ -71,7 +69,7 @@
             background: linear-gradient(135deg, rgb(0, 255, 214) 0%, rgb(8, 226, 96) 100%);
             transition: all 0.5s ease-in-out;
             transform-style: preserve-3d;
-            box-shadow: rgba(5, 71, 17, 0) 40px 50px 25px -40px, rgba(5, 71, 17, 0.2) 0px 25px 25px -5px;
+            box-shadow: 0 15px 25px -5px rgba(0,0,0,0.5);
             position: relative;
             overflow: visible !important;
             will-change: transform, box-shadow;
@@ -89,11 +87,10 @@
             inset: 8px;
             border-radius: 35px;
             border-top-right-radius: 100%;
-            background: linear-gradient(0deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.4) 100%);
+            background: rgba(255, 255, 255, 0.1);
             transform: translate3d(0px, 0px, 25px);
             border-left: 1px solid rgba(255,255,255,0.3);
             border-bottom: 1px solid rgba(255,255,255,0.3);
-            transition: all 0.5s ease-in-out;
             pointer-events: none;
         }
         .content-3d {
@@ -181,23 +178,6 @@
         .progress-bar-bg { background-color: rgba(255,255,255,0.1); border-radius: 9999px; height: 8px; overflow: hidden; }
         .progress-bar-fill { background: linear-gradient(90deg, #00ffd6, #8b5cf6); height: 100%; border-radius: 9999px; transition: width 1s ease-out; }
 
-        /* Logo Animations */
-        @keyframes spin-slow { 100% { transform: rotate(360deg); } }
-        @keyframes spin-slow-reverse { 100% { transform: rotate(-360deg); } }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-        @keyframes pulse-glow { 0%, 100% { opacity: 0.8; filter: drop-shadow(0 0 8px rgba(0,255,157,0.6)); } 50% { opacity: 1; filter: drop-shadow(0 0 15px rgba(0,255,157,0.9)); } }
-        @keyframes pulse-glow-strong { 0%, 100% { opacity: 0.9; filter: drop-shadow(0 0 15px rgba(0,255,157,0.7)); } 50% { opacity: 1; filter: drop-shadow(0 0 25px rgba(0,255,157,1)); } }
-        @keyframes globe-spin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
-        @keyframes dash-flow { to { stroke-dashoffset: -270; } }
-        
-        .animate-spin-slow { animation: spin-slow 20s linear infinite; transform-origin: 500px 500px; }
-        .animate-spin-slow-reverse { animation: spin-slow-reverse 15s linear infinite; transform-origin: 500px 500px; }
-        .animate-blink { animation: blink 2s ease-in-out infinite; }
-        .animate-pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
-        .animate-pulse-glow-strong { animation: pulse-glow-strong 2.5s ease-in-out infinite; }
-        .animate-globe-spin { animation: globe-spin 10s linear infinite; transform-origin: 430px 490px; }
-        .animate-dash-flow { animation: dash-flow 4s linear infinite; }
-        
         /* Improved mobile scale fix to prevent UI cutoffs */
         @media (max-width: 768px) {
             body {
@@ -235,11 +215,28 @@
         .option-item { padding: 8px 12px; font-size: 0.75rem; cursor: pointer; color: white; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .option-item:hover { background: var(--accent); color: #000; }
         .no-scroll { overflow: hidden !important; }
+
+        /* Logo Animations */
+        @keyframes spin-slow { 100% { transform: rotate(360deg); } }
+        @keyframes spin-slow-reverse { 100% { transform: rotate(-360deg); } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        @keyframes pulse-glow { 0%, 100% { opacity: 0.8; filter: drop-shadow(0 0 8px rgba(0,255,157,0.6)); } 50% { opacity: 1; filter: drop-shadow(0 0 15px rgba(0,255,157,0.9)); } }
+        @keyframes pulse-glow-strong { 0%, 100% { opacity: 0.9; filter: drop-shadow(0 0 15px rgba(0,255,157,0.7)); } 50% { opacity: 1; filter: drop-shadow(0 0 25px rgba(0,255,157,1)); } }
+        @keyframes globe-spin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
+        @keyframes dash-flow { to { stroke-dashoffset: -270; } }
+        
+        .animate-spin-slow { animation: spin-slow 20s linear infinite; transform-origin: 500px 500px; }
+        .animate-spin-slow-reverse { animation: spin-slow-reverse 15s linear infinite; transform-origin: 500px 500px; }
+        .animate-blink { animation: blink 2s ease-in-out infinite; }
+        .animate-pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
+        .animate-pulse-glow-strong { animation: pulse-glow-strong 2.5s ease-in-out infinite; }
+        .animate-globe-spin { animation: globe-spin 10s linear infinite; transform-origin: 430px 490px; }
+        .animate-dash-flow { animation: dash-flow 4s linear infinite; }
     </style>
 </head>
 <body class="p-4 md:p-8 pt-2 md:pt-8">
     <div class="liquid-blob"></div>
-    
+
     <div id="loader-overlay" class="overlay hide" style="z-index: 100020 !important;">
         <div class="glass-panel p-8 w-auto flex flex-col items-center justify-center">
             <svg class="w-12 h-12 text-[#00ffd6] animate-spin" fill="none" viewBox="0 0 24 24">
@@ -250,6 +247,7 @@
         </div>
     </div>
 
+    <!-- Initial Premium Boot Loader -->
     <div id="initial-boot-loader" class="overlay flex-col" style="z-index: 100050 !important; background: #09090b;">
         <svg viewBox="0 0 1000 1000" class="w-32 h-32 drop-shadow-[0_0_20px_rgba(0,255,157,0.4)] animate-pulse-glow">
             <g class="animate-spin-slow">
@@ -262,11 +260,12 @@
         </svg>
         <p class="text-[#00ffd6] font-mono mt-8 font-bold tracking-widest text-lg animate-pulse">INITIALIZING CIEL KERNEL...</p>
     </div>
-
+    
     <!-- Login Overlay -->
     <div id="login-overlay" class="overlay">
         <div class="glass-panel p-8 w-full max-w-md text-center mx-4">
             <div class="mx-auto mb-6 flex items-center justify-center">
+                <!-- User's Pixel Perfect SVG Logo -->
                 <svg viewBox="0 0 1000 1000" class="w-32 h-32 drop-shadow-[0_0_20px_rgba(0,255,157,0.4)]">
                     <defs>
                         <linearGradient id="grad-c" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -282,27 +281,14 @@
                             <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
                             <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
                         </filter>
-                        <filter id="glow-intense">
-                            <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
-                            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                        </filter>
-                        <clipPath id="c-notches" clipPathUnits="userSpaceOnUse">
-                            <path d="M 0,0 L 1000,0 L 1000,1000 L 0,1000 Z M 260,450 L 320,450 L 320,465 L 260,465 Z M 260,515 L 320,515 L 320,530 L 260,530 Z" fill-rule="evenodd" clip-rule="evenodd" />
-                        </clipPath>
                     </defs>
                     <g class="opacity-70">
                         <circle cx="500" cy="500" r="390" fill="none" stroke="#00ff9d" stroke-width="2" opacity="0.15" />
-                        <g stroke="#00ff9d" stroke-width="3" opacity="0.5">
-                            <line x1="500" y1="100" x2="500" y2="115" /><line x1="500" y1="885" x2="500" y2="900" /><line x1="100" y1="500" x2="115" y2="500" /><line x1="885" y1="500" x2="900" y2="500" />
-                            <circle cx="225" cy="225" r="3" fill="#00ff9d" /><circle cx="775" cy="225" r="3" fill="#00ff9d" /><circle cx="225" cy="775" r="3" fill="#00ff9d" /><circle cx="775" cy="775" r="3" fill="#00ff9d" />
-                        </g>
                         <g class="animate-spin-slow">
                             <circle cx="500" cy="500" r="365" fill="none" stroke="#00ff9d" stroke-width="5" stroke-dasharray="400 350" opacity="0.7" />
-                            <circle cx="500" cy="500" r="375" fill="none" stroke="#00ff9d" stroke-width="2" stroke-dasharray="4 20" opacity="0.5" />
                         </g>
                         <g class="animate-spin-slow-reverse">
                             <circle cx="500" cy="500" r="335" fill="none" stroke="#00ff9d" stroke-width="4.5" stroke-dasharray="30 80 150 60" opacity="0.6" />
-                            <circle cx="500" cy="500" r="325" fill="none" stroke="#00ff9d" stroke-width="2" stroke-dasharray="60 40" opacity="0.4" />
                         </g>
                     </g>
                     <g filter="url(#glow-light)">
@@ -310,66 +296,16 @@
                         <path d="M 500,90 L 515,120 L 500,150 L 485,120 Z" fill="#00ff9d" />
                         <line x1="500" y1="20" x2="500" y2="50" stroke="#00ff9d" stroke-width="2.5" />
                         <circle cx="500" cy="20" r="5" fill="#00ff9d" class="animate-blink" />
-                        <line x1="500" y1="190" x2="500" y2="220" stroke="#00ff9d" stroke-width="2.5" />
-                        <circle cx="500" cy="220" r="5" fill="#00ff9d" opacity="0.8" />
-                        <line x1="420" y1="120" x2="465" y2="120" stroke="#00ff9d" stroke-width="2.5" />
-                        <circle cx="420" cy="120" r="5" fill="#00ff9d" opacity="0.8" />
-                        <line x1="535" y1="120" x2="580" y2="120" stroke="#00ff9d" stroke-width="2.5" />
-                        <circle cx="580" cy="120" r="5" fill="#00ff9d" opacity="0.8" />
-                        <path d="M 390,120 A 420 420 0 0 1 610 120" fill="none" stroke="#00ff9d" stroke-width="1.5" opacity="0.4" />
-                    </g>
-                    <g filter="url(#glow-light)">
-                        <polygon points="500,820 535,840 535,880 500,900 465,880 465,840" fill="none" stroke="#00ff9d" stroke-width="2.5" />
-                        <g opacity="0.9" class="animate-pulse-glow">
-                            <circle cx="500" cy="845" r="5" fill="#00ff9d" /><circle cx="480" cy="875" r="5" fill="#00ff9d" /><circle cx="520" cy="875" r="5" fill="#00ff9d" />
-                            <path d="M 500,845 L 480,875 L 520,875 Z" fill="none" stroke="#00ff9d" stroke-width="2.5" />
-                        </g>
-                        <path d="M 440,900 A 390 390 0 0 0 560 900" fill="none" stroke="#00ff9d" stroke-width="1.5" opacity="0.4" />
-                    </g>
-                    <g stroke="#00ff9d" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.85">
-                        <path d="M 220,410 L 260,410 L 280,430 L 320,430" />
-                        <circle cx="220" cy="410" r="4" fill="#00ff9d" class="animate-blink" style="animation-delay: 0s" />
-                        <path d="M 120,458 L 240,458 L 260,458 L 315,458" stroke-width="3" />
-                        <rect x="115" y="453" width="10" height="10" fill="none" stroke="#00ff9d" stroke-width="2" transform="rotate(45 120 458)" />
-                        <path d="M 80,490 L 160,490 L 180,490" />
-                        <circle cx="80" cy="490" r="4.5" fill="#00ff9d" />
-                        <polygon points="180,490 190,483 200,490 190,497" fill="#00ff9d" />
-                        <path d="M 140,523 L 240,523 L 260,523 L 315,523" stroke-width="3" />
-                        <rect x="135" y="518" width="10" height="10" fill="#00ff9d" transform="rotate(45 140 523)" />
-                        <path d="M 160,560 L 200,560 L 220,545 L 260,545" />
-                        <circle cx="160" cy="560" r="3" fill="none" stroke="#00ff9d" />
-                        <path d="M 120,458 L 260,458 L 315,458" stroke="#ffffff" stroke-width="2" stroke-dasharray="15 120" class="animate-dash-flow" />
-                    </g>
-                    <g stroke="#00ff9d" stroke-width="2.5" stroke-linecap="round" opacity="0.85">
-                        <line x1="680" y1="440" x2="780" y2="440" />
-                        <rect x="780" y="435" width="10" height="10" transform="rotate(45 785 440)" fill="none" />
-                        <line x1="680" y1="465" x2="820" y2="465" stroke-dasharray="4 10" opacity="0.8" />
-                        <path d="M 680,490 L 740,490 L 760,490" />
-                        <polygon points="760,490 770,483 780,490 770,497" fill="#00ff9d" />
-                        <line x1="680" y1="515" x2="740" y2="515" />
-                        <circle cx="745" cy="515" r="4" fill="#00ff9d" />
                     </g>
                     <g class="animate-pulse-glow-strong">
-                        <path d="M 490,340 L 450,340 A 150 150 0 0 0 450 640 L 490,640 L 490,570 L 450,570 A 80 80 0 0 1 450 410 L 490,410 Z" fill="url(#grad-c)" clip-path="url(#c-notches)" />
-                        <path d="M 490,340 L 450,340 A 150 150 0 0 0 450 640 L 490,640" fill="none" stroke="#ffffff" stroke-width="3.5" opacity="0.6" clip-path="url(#c-notches)" />
+                        <path d="M 490,340 L 450,340 A 150 150 0 0 0 450 640 L 490,640 L 490,570 L 450,570 A 80 80 0 0 1 450 410 L 490,410 Z" fill="url(#grad-c)" />
                         <path d="M 510,340 L 580,340 L 580,560 L 750,560 L 710,640 L 510,640 Z" fill="url(#grad-l)" filter="url(#glow-light)" />
-                        <path d="M 510,340 L 580,340 L 580,560 L 750,560" fill="none" stroke="#ffffff" stroke-width="2.5" opacity="0.5" />
                     </g>
                     <g class="animate-globe-spin" stroke="#00ff9d" stroke-width="1.5" opacity="0.8">
                         <g transform="translate(430, 490)">
                             <circle cx="0" cy="0" r="48" fill="none" opacity="0.6" />
                             <ellipse cx="0" cy="0" rx="48" ry="18" fill="none" opacity="0.5" transform="rotate(30)" />
                             <ellipse cx="0" cy="0" rx="48" ry="18" fill="none" opacity="0.5" transform="rotate(-30)" />
-                            <ellipse cx="0" cy="0" rx="18" ry="48" fill="none" opacity="0.5" />
-                            <g fill="#00ff9d" stroke="none">
-                                <circle cx="0" cy="-48" r="2.5" /><circle cx="0" cy="48" r="2.5" /><circle cx="-38" cy="-15" r="2.5" /><circle cx="38" cy="15" r="2.5" />
-                                <circle cx="-20" cy="-30" r="2" /><circle cx="15" cy="35" r="2" /><circle cx="-25" cy="25" r="2" /><circle cx="20" cy="-25" r="2" />
-                            </g>
-                            <g stroke="#00ff9d" stroke-width="1" opacity="0.7">
-                                <line x1="0" y1="-48" x2="-20" y2="-30" /><line x1="-20" y1="-30" x2="-38" y2="-15" /><line x1="-38" y1="-15" x2="-25" y2="25" /><line x1="-25" y1="25" x2="0" y2="48" />
-                                <line x1="0" y1="48" x2="15" y2="35" /><line x1="15" y1="35" x2="38" y2="15" /><line x1="38" y1="15" x2="20" y2="-25" /><line x1="20" y1="-25" x2="0" y2="-48" />
-                                <line x1="-20" y1="-30" x2="20" y2="-25" /><line x1="-25" y1="25" x2="15" y2="35" /><line x1="0" y1="-48" x2="38" y2="15" />
-                            </g>
                         </g>
                     </g>
                     <g>
@@ -378,13 +314,6 @@
                             <path d="M 460,685 L 460,725" />
                             <path d="M 485,685 L 525,685 M 485,705 L 515,705 M 485,725 L 525,725" />
                             <path d="M 550,685 L 550,725 L 590,725" />
-                        </g>
-                        <g transform="translate(0, 10)">
-                            <text x="492" y="770" fill="#00ff9d" font-family="'Courier New', Courier, monospace" font-size="15" font-weight="bold" letter-spacing="6" text-anchor="middle" opacity="0.9" class="animate-pulse-glow">
-                                PROXY ROUTING SYSTEM
-                            </text>
-                            <line x1="285" y1="765" x2="340" y2="765" stroke="#00ff9d" stroke-width="1" opacity="0.6" />
-                            <line x1="645" y1="765" x2="700" y2="765" stroke="#00ff9d" stroke-width="1" opacity="0.6" />
                         </g>
                     </g>
                 </svg>
@@ -405,24 +334,6 @@
                 <!-- Logo -->
                 <div class="w-16 h-16 md:w-20 md:h-20 flex-shrink-0">
                     <svg viewBox="0 0 1000 1000" class="w-full h-full drop-shadow-[0_0_15px_rgba(0,255,157,0.6)]">
-                        <defs>
-                            <linearGradient id="grad-c-h" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stop-color="#ffffff" />
-                                <stop offset="40%" stop-color="#e0f7fa" />
-                                <stop offset="100%" stop-color="#4dd0e1" />
-                            </linearGradient>
-                            <linearGradient id="grad-l-h" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#00ffa3" />
-                                <stop offset="100%" stop-color="#008f7a" />
-                            </linearGradient>
-                            <filter id="glow-light-h">
-                                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                                <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                            </filter>
-                            <clipPath id="c-notches-h" clipPathUnits="userSpaceOnUse">
-                                <path d="M 0,0 L 1000,0 L 1000,1000 L 0,1000 Z M 260,450 L 320,450 L 320,465 L 260,465 Z M 260,515 L 320,515 L 320,530 L 260,530 Z" fill-rule="evenodd" clip-rule="evenodd" />
-                            </clipPath>
-                        </defs>
                         <g class="opacity-70">
                             <circle cx="500" cy="500" r="390" fill="none" stroke="#00ff9d" stroke-width="4" opacity="0.15" />
                             <g class="animate-spin-slow">
@@ -439,8 +350,8 @@
                             <circle cx="500" cy="20" r="5" fill="#00ff9d" class="animate-blink" />
                         </g>
                         <g class="animate-pulse-glow-strong">
-                            <path d="M 490,340 L 450,340 A 150 150 0 0 0 450 640 L 490,640 L 490,570 L 450,570 A 80 80 0 0 1 450 410 L 490,410 Z" fill="url(#grad-c-h)" clip-path="url(#c-notches-h)" />
-                            <path d="M 510,340 L 580,340 L 580,560 L 750,560 L 710,640 L 510,640 Z" fill="url(#grad-l-h)" filter="url(#glow-light-h)" />
+                            <path d="M 490,340 L 450,340 A 150 150 0 0 0 450 640 L 490,640 L 490,570 L 450,570 A 80 80 0 0 1 450 410 L 490,410 Z" fill="url(#grad-c)" />
+                            <path d="M 510,340 L 580,340 L 580,560 L 750,560 L 710,640 L 510,640 Z" fill="url(#grad-l)" filter="url(#glow-light)" />
                         </g>
                         <g class="animate-globe-spin" stroke="#00ff9d" stroke-width="3" opacity="0.8">
                             <g transform="translate(430, 490)">
@@ -475,7 +386,7 @@
                 <div class="relative">
                     <button onclick="toggleMenu()" class="refresh-btn p-2 md:p-3 rounded-xl text-xl md:text-2xl leading-none w-10 h-10 md:w-12 md:h-12 flex items-center justify-center">⋮</button>
                     <div id="dropdown-menu" class="absolute right-0 mt-2 w-56 glass-panel py-2 hidden flex-col z-50">
-                        <button onclick="showPollingModal(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full uppercase font-black">Kernel Settings</button>
+                        <button onclick="showModal('modal-polling'); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full uppercase font-black">Kernel Settings</button>
                         <button onclick="showModal('password-modal'); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full">Change Password</button>
                         <div class="border-t border-white/10 my-1"></div>
                         <button onclick="exportData(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-[#00ffd6] font-bold w-full flex items-center gap-2">↓ Export Backup</button>
@@ -618,6 +529,10 @@
                         <input type="checkbox" id="bulk-auto-assign" class="rounded bg-black/50 border-white/10 text-purple-500">
                         Auto-Assign to Free Keys
                     </label>
+                    <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                        <input type="checkbox" id="bulk-overwrite-pass" class="rounded bg-black/50 border-white/10 text-purple-500">
+                        Update Existing Password/Port
+                    </label>
                 </div>
 
                 <div class="flex gap-4 pt-4">
@@ -650,14 +565,6 @@
                 <div><p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Polling Interval (Seconds)</p><input id="poll-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none"></div>
                 <div><p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Force Check Interval (Seconds)</p><input id="force-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none"></div>
                 <div><p class="text-[10px] opacity-50 mb-1 font-bold text-left uppercase">Max Hold Duration (Seconds)</p><input id="hold-sec" type="number" class="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-center text-xl font-black text-accent outline-none"></div>
-                
-                <div class="flex items-center justify-between bg-white/5 p-3 rounded-xl">
-                    <span class="text-xs font-bold text-white uppercase">Auto-Heal Proxies</span>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="auto-heal-check" class="sr-only peer">
-                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00ffd6]"></div>
-                    </label>
-                </div>
             </div>
             <div class="flex gap-3 mt-6"><button onclick="hideModal('modal-polling')" class="flex-1 p-3 rounded-xl bg-white/5 font-bold">Cancel</button><button onclick="savePolling()" class="flex-1 p-3 rounded-xl btn-primary">Update</button></div>
         </div>
@@ -723,7 +630,7 @@
                 const panel = el.querySelector('.glass-panel');
                 if(panel) {
                     const scrollY = window.pageYOffset || document.documentElement.scrollTop;
-                    const centerY = (scrollY + (window.innerHeight / 2)) / scale;
+                    const centerY = (scrollY + (window.innerHeight / 2.3)) / scale;
                     panel.style.position = 'absolute';
                     panel.style.top = centerY + 'px';
                     panel.style.left = '50%';
@@ -759,13 +666,7 @@
             document.querySelectorAll('.select-options').forEach(el=>{if(el.id!=='opt-'+id) el.classList.remove('show')}); 
             document.querySelectorAll('.parent-card').forEach(el => el.style.zIndex = '1');
             const opt = document.getElementById('opt-'+id);
-            if (opt.classList.contains('show')) {
-                opt.classList.remove('show');
-            } else {
-                opt.classList.add('show');
-                const parent = opt.closest('.parent-card');
-                if (parent) parent.style.zIndex = '50';
-            }
+            if (opt.classList.toggle('show')) opt.closest('.parent-card').style.zIndex = '50';
         }
         
         document.addEventListener('click', function(e) {
@@ -977,7 +878,6 @@
             if(!ip || !port) return showToast('IP and Port required', true);
             
             if (id) {
-                // To "edit", delete old and add new (simplest backend logic without changing python)
                 await fetch('/admin/proxies/'+id, {method:'DELETE',headers:{'Authorization':`Bearer ${sessionToken}`}});
             }
             
@@ -1050,6 +950,7 @@
                 try {
                     const data = JSON.parse(e.target.result);
                     document.getElementById('loader-text').innerText = "RESTORING BACKUP...";
+                    document.body.classList.add('no-scroll');
                     showModal('loader-overlay');
                     
                     // Restore Proxies
@@ -1090,9 +991,11 @@
                     event.target.value = ''; // reset
                     refreshAll();
                     hideModal('loader-overlay');
+                    document.body.classList.remove('no-scroll');
                     showToast("Restore Complete!");
                 } catch(err) {
                     hideModal('loader-overlay');
+                    document.body.classList.remove('no-scroll');
                     showToast("Invalid Backup File", true);
                 }
             };
