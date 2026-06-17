@@ -89,6 +89,14 @@ class DatabaseManager:
             """)
             await conn.execute("CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT)")
             await conn.execute("""
+                CREATE TABLE IF NOT EXISTS client_keys (
+                    key TEXT PRIMARY KEY,
+                    name TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS usage_stats (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
