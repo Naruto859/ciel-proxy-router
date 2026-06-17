@@ -384,15 +384,18 @@ class KeyManager:
             if proxy_id:
                 active_proxy = await db.get_proxy_by_id(proxy_id)
                 if not active_proxy:
-                    # Invalid proxy reference - don't mark key red, just fallback
-                    add_log(f"WARNING: Key {key[:8]} has invalid proxy reference. Defaulting to VPS.")
-                    proxy_id = None
+                    add_log(f"WARNING: Key {key[:8]} has broken proxy ID {proxy_id}. Routing via VPS.")
+                    proxy_id = None # Fallback to VPS
                 else:
                     proxy_info = active_proxy['ip']
-                    # Attempt all available credentials for this proxy
-                    creds_to_try = [{"username": active_proxy['username'], "password": active_proxy['password']}]
-                    pool = await db.get_proxy_credentials(proxy_id)
-                    creds_to_try.extend(pool)
+                    # Try MAIN credentials
+                    creds_to_try = [{"username": active_proxy['username'], "password": active_proxy['password'], "is_main": True}]
+                    
+                    # Try POOL credentials
+                    try:
+                        pool = await db.get_proxy_credentials(proxy_id)
+                        for p in pool: creds_to_try.append({**p, "is_main": False})
+                    except: pass # Table might be missing in old DBs
                     
                     for cred in creds_to_try:
                         try:
@@ -403,57 +406,52 @@ class KeyManager:
                             response = await client_attempt.get(f"{BASE_URL}/account/balance", headers=headers, timeout=10.0)
                             
                             if response.status_code == 200:
-                                # SUCCESS: Both Proxy and Key are working
                                 await db.update_proxy_status(proxy_id, 'operational')
+                                if not cred["is_main"]:
+                                    # Promote working pool creds to main
+                                    await db.add_proxy(active_proxy['ip'], active_proxy['port'], cred['username'], cred['password'])
+                                
                                 balance = response.json().get("balance", 0.0)
                                 await db.update_balance(key, balance)
                                 add_log(f"Balance check SUCCESS for {key[:8]}... via {proxy_info}: {balance}")
                                 return balance, proxy_info
                             
-                            elif response.status_code in (401, 403):
-                                # KEY FAILURE: Proxy worked, but API Key is rejected
+                            elif response.status_code in (401, 403, 402):
+                                # Key itself is invalid or out of credits
                                 await db.update_balance(key, 0.0)
-                                add_log(f"API KEY REJECTED for {key[:8]}... via {proxy_info} (HTTP {response.status_code})")
+                                add_log(f"API KEY FAILED (HTTP {response.status_code}) for {key[:8]}... via {proxy_info}")
                                 return 0.0, proxy_info
-                                
-                            elif response.status_code == 402:
-                                # KEY FAILURE: Out of credits
-                                await db.update_balance(key, 0.0)
-                                return 0.0, proxy_info
-                        
-                        except Exception:
-                            continue # Try next credential in pool
+                        except: continue
                     
-                    # If we reach here, PROXY has failed (Connection error or 5xx)
+                    # Proxy is dead
                     await db.update_proxy_status(proxy_id, 'failed')
-                    add_log(f"NODE FAILURE: Proxy {proxy_info} is unreachable or rejected all credentials.")
+                    add_log(f"NODE FAILED: Proxy {proxy_info} unreachable or wrong creds.")
                     
-                    # Only auto-heal if enabled
                     if await db.get_auto_heal_enabled():
                         new_pid = await db.get_unreserved_healthy_proxy(key)
                         if new_pid:
                             new_proxy = await db.get_proxy_by_id(new_pid)
                             await db.update_key_proxy(key, new_pid, is_home=False)
-                            add_log(f"AUTO-HEAL: Re-routing key {key[:8]} to healthy dedicated node {new_proxy['ip']}")
+                            add_log(f"AUTO-HEAL: Re-routing key {key[:8]} from RED node to GREEN dedicated node {new_proxy['ip']}")
                             return await self.check_balance({**key_data, "proxy_id": new_pid})
                     
-                    # If auto-heal off or no replacements, mark key as "Proxy Error" state but don't set balance to 0
-                    return -2.0, proxy_info
+                    return -2.0, proxy_info # Mark as proxy error
 
-            # Direct VPS Check (if no proxy_id or fallback)
+            # Direct VPS Check
             headers = {"Authorization": f"Bearer {key}", "User-Agent": "curl/8.5.0"}
             response = await client.get(f"{BASE_URL}/account/balance", headers=headers, timeout=10.0)
             if response.status_code == 200:
                 balance = response.json().get("balance", 0.0)
                 await db.update_balance(key, balance)
+                add_log(f"Balance SUCCESS for {key[:8]}... via VPS IP: {balance}")
                 return balance, "VPS IP (Direct)"
             elif response.status_code in (401, 403, 402):
                 await db.update_balance(key, 0.0)
+                add_log(f"API KEY FAILED (HTTP {response.status_code}) for {key[:8]}... via VPS IP")
                 return 0.0, "VPS IP (Direct)"
                 
         except Exception as e:
-            add_log(f"System attempt failed for {key[:8]}...: {str(e)}")
-            
+            add_log(f"Critical System Error for {key[:8]}...: {str(e)}")
         return -2.0, proxy_info
 
     async def force_pull_balances(self):
@@ -483,7 +481,13 @@ async def log_cleanup_worker():
     while True:
         await asyncio.sleep(5 * 3600)
         system_logs.clear()
-        add_log("System logs automatically cleared (5h rotation).")
+        async with aiosqlite.connect(DB_PATH) as conn:
+            # Delete usage stats older than 7 days to keep DB fast, but keep some analytics
+            ist = timezone(timedelta(hours=5, minutes=30))
+            seven_days_ago = (datetime.now(ist) - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+            await conn.execute("DELETE FROM usage_stats WHERE timestamp < ?", (seven_days_ago,))
+            await conn.commit()
+        add_log("System logs & old DB stats automatically cleared (5h rotation).")
 
 async def auto_heal_worker():
     """Runs every 24 hours to re-test RED proxies and revert keys to Home IPs if recovered."""
@@ -913,10 +917,10 @@ async def core_proxy(request: Request):
             if not is_stream:
                 resp = await proxy_client.post(f"{BASE_URL}/v1/chat/completions", headers=headers, content=raw_body, timeout=90.0)
                 await db.log_usage(request.url.path, resp.status_code)
-                add_log(f"Req: {key_data['key'][:8]} via {proxy_info} -> {resp.status_code}")
+                add_log(f"Request: {key_data['key'][:8]} via {proxy_info} -> HTTP {resp.status_code}")
                 
                 if resp.status_code in (401, 402, 403, 429, 500, 502, 503, 504):
-                    add_log(f"Key {key_data['key'][:8]} failed with {resp.status_code}. Draining and shifting to NEXT key...")
+                    add_log(f"ALERT: Key {key_data['key'][:8]} hit {resp.status_code}. Draining/Switching...")
                     await db.update_balance(key_data['key'], 0.0); continue
                 
                 safe_headers = {"Content-Type": resp.headers.get("content-type", "application/json")}
@@ -924,13 +928,14 @@ async def core_proxy(request: Request):
                     return JSONResponse(translate_openai_resp_to_anthropic(resp.json()), headers=safe_headers)
                 return Response(content=resp.content, status_code=resp.status_code, headers=safe_headers)
             else:
-                # Optimized Streaming: Check status before yielding
                 resp_ctx = proxy_client.stream("POST", f"{BASE_URL}/v1/chat/completions", headers=headers, content=raw_body, timeout=90.0)
                 resp_stream = await resp_ctx.__aenter__()
                 
+                add_log(f"Stream Start: {key_data['key'][:8]} via {proxy_info} -> HTTP {resp_stream.status_code}")
+                
                 if resp_stream.status_code in (401, 402, 403, 429, 500, 502, 503, 504):
                     await resp_ctx.__aexit__(None, None, None)
-                    add_log(f"Key {key_data['key'][:8]} streaming failed with {resp_stream.status_code}. Draining and shifting to NEXT key...")
+                    add_log(f"ALERT: Stream {key_data['key'][:8]} hit {resp_stream.status_code}. Shifting...")
                     await db.update_balance(key_data['key'], 0.0); continue
                 
                 if resp_stream.status_code != 200:
