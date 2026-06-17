@@ -65,26 +65,16 @@ class DatabaseManager:
                     username TEXT,
                     password TEXT,
                     status TEXT DEFAULT 'operational',
+                    reserved_for_key TEXT DEFAULT NULL,
                     is_active INTEGER DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             await conn.execute("""
-                CREATE TABLE IF NOT EXISTS proxy_credentials (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    proxy_id INTEGER,
-                    username TEXT,
-                    password TEXT,
-                    is_active INTEGER DEFAULT 1,
-                    FOREIGN KEY (proxy_id) REFERENCES proxies (id)
-                )
-            """)
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS client_keys (
-                    key TEXT PRIMARY KEY,
-                    name TEXT,
-                    is_active INTEGER DEFAULT 1,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                CREATE TABLE IF NOT EXISTS login_security (
+                    ip TEXT PRIMARY KEY,
+                    attempts INTEGER DEFAULT 0,
+                    locked_until TIMESTAMP
                 )
             """)
             await conn.execute("CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT)")
@@ -123,11 +113,47 @@ class DatabaseManager:
         async with aiosqlite.connect(self.path) as conn:
             if is_home:
                 await conn.execute("UPDATE keys SET proxy_id = ?, home_proxy_id = ? WHERE key = ?", (proxy_id, proxy_id, key))
+                if proxy_id:
+                    # Permanently reserve this proxy for this specific key
+                    await conn.execute("UPDATE proxies SET reserved_for_key = ? WHERE id = ?", (key, proxy_id))
             else:
                 await conn.execute("UPDATE keys SET proxy_id = ? WHERE key = ?", (proxy_id, key))
             await conn.commit()
 
-    async def update_balance(self, key: str, balance: float):
+    async def get_security_status(self, ip: str):
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("SELECT * FROM login_security WHERE ip = ?", (ip,)) as cursor:
+                return await cursor.fetchone()
+
+    async def record_login_attempt(self, ip: str, success: bool):
+        async with aiosqlite.connect(self.path) as conn:
+            if success:
+                await conn.execute("DELETE FROM login_security WHERE ip = ?", (ip,))
+            else:
+                now = datetime.now()
+                await conn.execute("""
+                    INSERT INTO login_security (ip, attempts, locked_until) 
+                    VALUES (?, 1, NULL) 
+                    ON CONFLICT(ip) DO UPDATE SET 
+                        attempts = attempts + 1,
+                        locked_until = CASE WHEN attempts >= 4 THEN ? ELSE NULL END
+                """, (ip, (now + timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")))
+            await conn.commit()
+
+    async def get_unreserved_healthy_proxy(self, key: str) -> Optional[int]:
+        """Finds a healthy proxy that is either already reserved for this key OR not reserved for anyone."""
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            query = """
+                SELECT id FROM proxies 
+                WHERE status = 'operational' AND is_active = 1
+                AND (reserved_for_key IS NULL OR reserved_for_key = ?)
+                ORDER BY created_at DESC LIMIT 1
+            """
+            async with conn.execute(query, (key,)) as cursor:
+                row = await cursor.fetchone()
+                return row['id'] if row else None
         async with aiosqlite.connect(self.path) as conn:
             await conn.execute("UPDATE keys SET balance = ?, last_checked = CURRENT_TIMESTAMP WHERE key = ?", (balance, key))
             await conn.commit()
@@ -387,11 +413,12 @@ class KeyManager:
                     
                     # AUTO-HEAL LOGIC
                     if await db.get_auto_heal_enabled():
-                        new_pid = await db.get_healthy_proxy_for_key(key)
+                        # Find a healthy proxy that is either reserved for this key or free
+                        new_pid = await db.get_unreserved_healthy_proxy(key)
                         if new_pid:
                             new_proxy = await db.get_proxy_by_id(new_pid)
-                            await db.update_key_proxy(key, new_pid)
-                            add_log(f"AUTO-HEAL: Shifted key {key[:8]} from RED proxy {proxy_info} to GREEN proxy {new_proxy['ip']}")
+                            await db.update_key_proxy(key, new_pid, is_home=False)
+                            add_log(f"AUTO-HEAL: Shifted key {key[:8]} from RED node to GREEN dedicated node {new_proxy['ip']}")
                             # Recurse once with new proxy
                             return await self.check_balance({**key_data, "proxy_id": new_pid})
 
@@ -497,11 +524,24 @@ def verify_admin_token(credentials: HTTPAuthorizationCredentials = Depends(secur
 
 # --- API ROUTES ---
 @app.post("/admin/auth")
-async def admin_auth(req: Dict):
+async def admin_auth(request: Request, req: Dict):
+    client_ip = request.client.host
+    status = await db.get_security_status(client_ip)
+    
+    if status and status['locked_until']:
+        locked_until = datetime.strptime(status['locked_until'], "%Y-%m-%d %H:%M:%S")
+        if datetime.now() < locked_until:
+            raise HTTPException(status_code=403, detail=f"Account locked. Try again after {status['locked_until']}")
+
     stored_hash = await db.get_admin_password_hash()
-    if bcrypt.checkpw(req.get('pin','').encode(), stored_hash.encode()):
+    success = bcrypt.checkpw(req.get('pin','').encode(), stored_hash.encode())
+    
+    await db.record_login_attempt(client_ip, success)
+    
+    if success:
         return {"token": SESSION_TOKEN}
-    raise HTTPException(status_code=401, detail="Invalid Password")
+    
+    raise HTTPException(status_code=401, detail="Invalid PIN")
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
