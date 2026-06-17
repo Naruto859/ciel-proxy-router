@@ -518,26 +518,42 @@
     <!-- Bulk Proxy Upload Modal -->
     <div id="modal-bulk-proxy" class="overlay hide">
         <div class="glass-panel p-8 w-full max-w-lg mx-4 relative max-h-[90vh] overflow-y-auto">
-            <h2 class="text-xl font-bold mb-2 uppercase text-white">Bulk Add Proxies</h2>
-            <p class="text-xs text-slate-400 mb-4">Paste proxy list. Formats accepted: <br><code>IP:PORT:USER:PASS</code> or <code>IP:PORT</code></p>
-            <div class="space-y-3">
-                <textarea id="bulk-proxy-text" rows="8" placeholder="192.168.1.1:8080:username:password&#10;10.0.0.1:3128" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none font-mono text-xs"></textarea>
+            <h2 class="text-xl font-bold mb-2 uppercase text-white">Bulk Proxy Management</h2>
+            <p class="text-xs text-slate-400 mb-4">Paste proxy list format: <code>IP:PORT:USER:PASS</code></p>
+            <div class="space-y-4">
+                <textarea id="bulk-proxy-text" rows="8" placeholder="192.168.1.1:8080:user:pass" class="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-white outline-none font-mono text-xs"></textarea>
                 
-                <div class="bg-purple-900/30 border border-purple-500/30 p-3 rounded-xl mt-2">
-                    <p class="text-xs text-purple-300 font-bold mb-2">Options:</p>
-                    <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer mb-2">
-                        <input type="checkbox" id="bulk-auto-assign" class="rounded bg-black/50 border-white/10 text-purple-500">
-                        Auto-Assign to Free Keys
+                <div class="space-y-3 bg-purple-900/20 border border-purple-500/20 p-4 rounded-xl">
+                    <p class="text-[10px] text-purple-300 font-black uppercase tracking-widest mb-1">Execution Modes</p>
+                    
+                    <label class="flex items-start gap-3 cursor-pointer group">
+                        <input type="checkbox" id="bulk-update-creds" class="mt-1 rounded bg-black border-white/10 text-purple-500">
+                        <div>
+                            <p class="text-xs font-bold text-white">Refresh Existing Nodes</p>
+                            <p class="text-[9px] text-slate-400 uppercase">Update Port/User/Pass if IP already exists in database.</p>
+                        </div>
                     </label>
-                    <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                        <input type="checkbox" id="bulk-overwrite-pass" class="rounded bg-black/50 border-white/10 text-purple-500">
-                        Update Existing Password/Port
+
+                    <label class="flex items-start gap-3 cursor-pointer group">
+                        <input type="checkbox" id="bulk-auto-heal" class="mt-1 rounded bg-black border-white/10 text-purple-500">
+                        <div>
+                            <p class="text-xs font-bold text-white">Heal Broken Assignments</p>
+                            <p class="text-[9px] text-slate-400 uppercase">Auto-replace proxies for keys currently marked as FAILED.</p>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start gap-3 cursor-pointer group">
+                        <input type="checkbox" id="bulk-replace-vps" class="mt-1 rounded bg-black border-white/10 text-purple-500">
+                        <div>
+                            <p class="text-xs font-bold text-white">Replace Direct VPS Nodes</p>
+                            <p class="text-[9px] text-slate-400 uppercase">Force assign proxies to keys currently using Direct VPS IP.</p>
+                        </div>
                     </label>
                 </div>
 
-                <div class="flex gap-4 pt-4">
-                    <button onclick="hideModal('modal-bulk-proxy')" class="flex-1 p-4 rounded-xl bg-white/5 font-bold">CANCEL</button>
-                    <button onclick="processBulkProxies()" class="flex-1 p-4 rounded-xl btn-primary">IMPORT LIST</button>
+                <div class="flex gap-4 pt-2">
+                    <button onclick="hideModal('modal-bulk-proxy')" class="flex-1 p-4 rounded-xl bg-white/5 font-bold text-xs uppercase">Cancel</button>
+                    <button onclick="processBulkProxies()" class="flex-1 p-4 rounded-xl btn-primary text-xs font-black">START INJECTION</button>
                 </div>
             </div>
         </div>
@@ -888,7 +904,10 @@
         async function processBulkProxies() {
             const text = document.getElementById('bulk-proxy-text').value.trim();
             if(!text) return showToast('Input is empty', true);
-            const autoAssign = document.getElementById('bulk-auto-assign').checked;
+            
+            const updateCreds = document.getElementById('bulk-update-creds').checked;
+            const autoHeal = document.getElementById('bulk-auto-heal').checked;
+            const replaceVps = document.getElementById('bulk-replace-vps').checked;
             
             document.getElementById('loader-text').innerText = "INJECTING NODES...";
             showModal('loader-overlay');
@@ -911,7 +930,12 @@
             const res = await fetch('/admin/proxies/bulk', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}`},
-                body: JSON.stringify({proxies: proxies_list, auto_assign: autoAssign})
+                body: JSON.stringify({
+                    proxies: proxies_list, 
+                    update_credentials: updateCreds,
+                    auto_heal_broken: autoHeal,
+                    replace_vps: replaceVps
+                })
             });
             const data = await res.json();
             

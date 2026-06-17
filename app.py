@@ -530,23 +530,78 @@ async def add_proxy(req: Dict):
     return {"success": True}
 
 @app.post("/admin/proxies/bulk", dependencies=[Depends(verify_admin_token)])
-async def bulk_proxies(req: Dict):
-    ps = req.get('proxies', []); auto = req.get('auto_assign', False)
-    for p in ps:
-        pid, is_new = await db.add_proxy(p['ip'], p['port'], p.get('username'), p.get('password'))
-        pd = await db.get_proxy_by_id(pid)
-        if pd:
+async def bulk_add_proxies(req: Dict):
+    proxies_to_add = req.get('proxies', [])
+    mode_update = req.get('update_credentials', False)
+    mode_heal = req.get('auto_heal_broken', False)
+    mode_replace_vps = req.get('replace_vps', False)
+    
+    added_count = 0
+    new_healthy_pids = []
+    
+    for p in proxies_to_add:
+        # 1. Add or Update proxy in DB
+        # If match by IP, update port/user/pass if mode_update is True
+        async with aiosqlite.connect(DB_PATH) as conn:
+            async with conn.execute("SELECT id, username, password, port FROM proxies WHERE ip = ?", (p['ip'],)) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    proxy_id = row[0]
+                    if mode_update:
+                        await conn.execute("UPDATE proxies SET port = ?, username = ?, password = ?, status = 'operational' WHERE id = ?", (p['port'], p.get('username'), p.get('password'), proxy_id))
+                    is_new = False
+                else:
+                    cur = await conn.execute("INSERT INTO proxies (ip, port, username, password) VALUES (?, ?, ?, ?)", (p['ip'], p['port'], p.get('username'), p.get('password')))
+                    proxy_id = cur.lastrowid
+                    is_new = True
+            await conn.commit()
+        
+        added_count += 1
+        
+        # 2. Test proxy immediately to mark as RED if dead
+        proxy_data = await db.get_proxy_by_id(proxy_id)
+        if proxy_data:
             try:
-                cl = await proxy_manager.get_client_for_proxy(pd)
-                r = await cl.get("https://api.ipify.org?format=json", timeout=10.0)
-                await db.update_proxy_status(pid, 'operational' if r.status_code == 200 else 'failed')
-            except: await db.update_proxy_status(pid, 'failed')
-        if auto and is_new:
-            ks = await db.get_keys(); fk = next((k for k in ks if not k.get('proxy_id')), None)
-            if fk:
-                final = await db.get_proxy_by_id(pid)
-                if final and final['status'] == 'operational': await db.update_key_proxy(fk['key'], pid, is_home=True)
-    return {"success": True, "added": len(ps)}
+                # Use a specific timeout for bulk testing
+                client = await proxy_manager.get_client_for_proxy(proxy_data)
+                resp = await client.get("https://api.ipify.org?format=json", timeout=8.0)
+                if resp.status_code == 200:
+                    await db.update_proxy_status(proxy_id, 'operational')
+                    new_healthy_pids.append(proxy_id)
+                else:
+                    await db.update_proxy_status(proxy_id, 'failed')
+            except Exception:
+                await db.update_proxy_status(proxy_id, 'failed')
+                
+    # 3. Assignment Logic
+    if mode_heal or mode_replace_vps:
+        keys = await db.get_keys()
+        for pid in new_healthy_pids:
+            # Check if this PID is already reserved for a key
+            async with aiosqlite.connect(DB_PATH) as conn:
+                async with conn.execute("SELECT 1 FROM keys WHERE proxy_id = ?", (pid,)) as cur:
+                    if await cur.fetchone(): continue # Proxy already busy
+            
+            target_key = None
+            if mode_heal:
+                # Prioritize keys that have a proxy_id but its status is 'failed'
+                for k in keys:
+                    if k.get('proxy_id'):
+                        curr_p = await db.get_proxy_by_id(k['proxy_id'])
+                        if curr_p and curr_p['status'] == 'failed':
+                            target_key = k['key']; break
+            
+            if not target_key and mode_replace_vps:
+                # Fallback to keys currently on VPS
+                for k in keys:
+                    if not k.get('proxy_id'):
+                        target_key = k['key']; break
+            
+            if target_key:
+                await db.update_key_proxy(target_key, pid, is_home=True)
+                add_log(f"SMART-ASSIGN: Linked {target_key[:8]} to healthy IP via Bulk Add.")
+
+    return {"success": True, "added": added_count}
 
 @app.delete("/admin/proxies/{proxy_id}", dependencies=[Depends(verify_admin_token)])
 async def delete_proxy(proxy_id: int): await db.delete_proxy(proxy_id); return {"success": True}
