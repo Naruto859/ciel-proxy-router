@@ -368,13 +368,17 @@ class KeyManager:
             
             if proxy_id:
                 active_proxy = await db.get_proxy_by_id(proxy_id)
-                if active_proxy:
+                if not active_proxy:
+                    add_log(f"WARNING: Key {key[:8]} is assigned to proxy ID {proxy_id} which no longer exists. Falling back to VPS.")
+                    # Reset the invalid proxy_id in DB
+                    await db.update_key_proxy(key, None, is_home=False)
+                else:
+                    proxy_info = active_proxy['ip']
                     # Gather all credentials to try (Main + Pool)
                     creds_to_try = [{"username": active_proxy['username'], "password": active_proxy['password']}]
                     pool = await db.get_proxy_credentials(proxy_id)
                     creds_to_try.extend(pool)
                     
-                    working_client = None
                     for cred in creds_to_try:
                         try:
                             # Construct a temporary proxy dict to get a client
@@ -386,40 +390,30 @@ class KeyManager:
                             
                             if response.status_code == 200:
                                 # Success! Found working credentials for this IP
-                                working_client = client_attempt
-                                proxy_info = active_proxy['ip']
-                                
-                                # If this was a pool credential, update the main one
-                                if cred.get('id'): # id exists only for pool items
-                                    await db.add_proxy(active_proxy['ip'], active_proxy['port'], cred['username'], cred['password'])
-                                
                                 await db.update_proxy_status(proxy_id, 'operational')
                                 balance = response.json().get("balance", 0.0)
                                 await db.update_balance(key, balance)
                                 add_log(f"Balance check SUCCESS for {key[:8]}... via {proxy_info}: {balance}")
                                 return balance, proxy_info
                             
-                            elif response.status_code == 402: # Out of balance is a key issue, not proxy issue
+                            elif response.status_code == 402: 
                                 await db.update_balance(key, 0.0)
-                                return 0.0, active_proxy['ip']
+                                return 0.0, proxy_info
                         
                         except Exception:
                             continue # Try next credentials in pool
                     
                     # If we reached here, NO credentials worked for this proxy
-                    proxy_info = active_proxy['ip']
                     await db.update_proxy_status(proxy_id, 'failed')
                     add_log(f"Proxy {proxy_info} CRITICAL FAILURE: All credentials failed.")
                     
                     # AUTO-HEAL LOGIC
                     if await db.get_auto_heal_enabled():
-                        # Find a healthy proxy that is either reserved for this key or free
                         new_pid = await db.get_unreserved_healthy_proxy(key)
                         if new_pid:
                             new_proxy = await db.get_proxy_by_id(new_pid)
                             await db.update_key_proxy(key, new_pid, is_home=False)
                             add_log(f"AUTO-HEAL: Shifted key {key[:8]} from RED node to GREEN dedicated node {new_proxy['ip']}")
-                            # Recurse once with new proxy
                             return await self.check_balance({**key_data, "proxy_id": new_pid})
 
             else:
@@ -555,7 +549,8 @@ async def list_keys():
 async def add_key(req: Dict):
     await db.add_key(req['key'], req.get('priority', 0))
     if req.get('proxy_id'):
-        await db.update_key_proxy(req['key'], req['proxy_id'])
+        # When provided during creation (e.g. import), set as dedicated Home IP
+        await db.update_key_proxy(req['key'], req['proxy_id'], is_home=True)
     
     keys = await db.get_keys()
     new_key_data = next((k for k in keys if k['key'] == req['key']), None)
