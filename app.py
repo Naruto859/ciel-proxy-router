@@ -209,6 +209,15 @@ class DatabaseManager:
             await conn.execute("UPDATE proxies SET status = ? WHERE id = ?", (status, proxy_id))
             await conn.commit()
 
+    async def delete_proxy(self, proxy_id: int):
+        async with aiosqlite.connect(self.path) as conn:
+            # Unlink any keys pointing at this proxy so they fall back to direct VPS
+            await conn.execute("UPDATE keys SET proxy_id = NULL WHERE proxy_id = ?", (proxy_id,))
+            await conn.execute("UPDATE keys SET home_proxy_id = NULL WHERE home_proxy_id = ?", (proxy_id,))
+            await conn.execute("DELETE FROM proxy_credentials WHERE proxy_id = ?", (proxy_id,))
+            await conn.execute("DELETE FROM proxies WHERE id = ?", (proxy_id,))
+            await conn.commit()
+
     async def add_proxy(self, ip: str, port: int, username: Optional[str] = None, password: Optional[str] = None) -> tuple[int, bool]:
         async with aiosqlite.connect(self.path) as conn:
             async with conn.execute("SELECT id, username, password, port FROM proxies WHERE ip = ?", (ip,)) as cursor:
