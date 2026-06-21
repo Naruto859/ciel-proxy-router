@@ -297,10 +297,10 @@ class DatabaseManager:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
 
-    async def generate_client_key(self, name: str) -> str:
-        new_key = f"ciel_sk_{secrets.token_hex(16)}"
+    async def generate_client_key(self, name: str, key: Optional[str] = None) -> str:
+        new_key = key if key else f"ciel_sk_{secrets.token_hex(16)}"
         async with aiosqlite.connect(self.path) as conn:
-            await conn.execute("INSERT INTO client_keys (key, name) VALUES (?, ?)", (new_key, name))
+            await conn.execute("INSERT OR IGNORE INTO client_keys (key, name) VALUES (?, ?)", (new_key, name))
             await conn.commit()
         return new_key
 
@@ -633,7 +633,7 @@ async def test_proxy_outbound(proxy_id: int):
 async def list_client_keys(): return {"keys": await db.get_client_keys()}
 
 @app.post("/admin/client-keys", dependencies=[Depends(verify_admin_token)])
-async def add_client_key(req: Dict): return {"success": True, "key": await db.generate_client_key(req['name'])}
+async def add_client_key(req: Dict): return {"success": True, "key": await db.generate_client_key(req['name'], req.get('key'))}
 
 @app.delete("/admin/client-keys/{key}", dependencies=[Depends(verify_admin_token)])
 async def delete_client_key(key: str): await db.revoke_client_key(key); return {"success": True}

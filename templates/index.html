@@ -797,7 +797,7 @@
                 const data = await res.json(); globalClientKeys = data.keys || [];
                 const grid = document.getElementById('client-keys-grid'); grid.innerHTML = '';
                 globalClientKeys.forEach(k => {
-                    grid.innerHTML += `<div class="glass-panel p-6 relative overflow-hidden group"><div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div><h3 class="text-xl font-bold text-white mb-1 relative z-10">${k.name}</h3><p class="font-mono text-sm text-[#00ffd6] mb-4 relative z-10">${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}</p><div class="flex justify-between items-center relative z-10"><span class="text-xs text-slate-500">${new Date(k.created_at).toLocaleDateString()}</span><button onclick="deleteClientKey('${k.key}')" class="text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded-lg hover:bg-red-500 hover:text-white transition-all">Revoke</button></div></div>`;
+                    grid.innerHTML += `<div class="glass-panel p-6 relative overflow-hidden group"><div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div><h3 class="text-xl font-bold text-white mb-1 relative z-10">${k.name}</h3><p class="font-mono text-sm text-[#00ffd6] mb-4 relative z-10">${k.key.substring(0, 12)}...${k.key.substring(k.key.length - 4)}</p><div class="flex justify-between items-center relative z-10"><span class="text-xs text-slate-500">${new Date(k.created_at).toLocaleDateString()}</span><div class="flex gap-2"><button onclick="copyClientKey('${k.key}', this)" class="text-xs bg-[#00ffd6]/20 text-[#00ffd6] px-3 py-1 rounded-lg hover:bg-[#00ffd6] hover:text-black transition-all font-bold flex items-center gap-1">📋 Copy</button><button onclick="deleteClientKey('${k.key}')" class="text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded-lg hover:bg-red-500 hover:text-white transition-all">Revoke</button></div></div></div>`;
                 });
             } catch(e) {}
         }
@@ -830,6 +830,12 @@
         async function deleteKey(k) { customConfirm('Delete this upstream node?', async() => { await fetch('/admin/keys/'+k,{method:'DELETE',headers:{'Authorization':`Bearer ${sessionToken}`}}); refreshData(); }); }
         async function deleteProxy(id) { customConfirm('Remove this IP endpoint?', async() => { await fetch('/admin/proxies/'+id,{method:'DELETE',headers:{'Authorization':`Bearer ${sessionToken}`}}); refreshData(); }); }
         async function deleteClientKey(key) { customConfirm('Revoke this Client Key?', async() => { await fetch(`/admin/client-keys/${key}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` }}); refreshClientKeys(); }); }
+        async function copyClientKey(key, btn) {
+            try { await navigator.clipboard.writeText(key); }
+            catch(e) { const t = document.createElement('textarea'); t.value = key; t.style.position='fixed'; t.style.opacity='0'; document.body.appendChild(t); t.focus(); t.select(); try{document.execCommand('copy');}catch(_){} document.body.removeChild(t); }
+            if (btn) { const o = btn.innerHTML; btn.innerHTML = '✓ Copied'; setTimeout(() => { btn.innerHTML = o; }, 1200); }
+            showToast('Client Key Copied');
+        }
 
         async function testProxy(id) { const el=document.getElementById('ps-'+id); el.classList.remove('hidden'); el.innerText='PROBING...'; try{ const res=await fetch('/admin/proxies/test/'+id, {headers:{'Authorization':`Bearer ${sessionToken}`}}); const d=await res.json(); if(d.success){ el.innerHTML=`<span style="color:#022c22">PASS: ${d.detected_ip}</span>`; showToast('Proxy Verified'); } else { el.innerHTML=`<span style="color:#ff5757">FAILED</span>`; showToast('Proxy Error',true); } } catch(e){ el.innerHTML=`<span style="color:#ff5757">TIMEOUT</span>`; showToast('Proxy Error',true);} }
         async function testKey(k) { showToast('Verifying...'); try { const res=await fetch('/admin/test/'+k,{headers:{'Authorization':`Bearer ${sessionToken}`}}); const d=await res.json(); document.getElementById('v-ip').innerText=d.ip||'VPS IP (Direct)'; document.getElementById('v-bal').innerText=(d.balance>0?d.balance:0).toFixed(4)+' P'; document.getElementById('v-status').innerHTML=d.success?'<span style="color:#00ffd6">VERIFIED</span>':'<span style="color:#ff5757">FAILED</span>'; showModal('modal-verify'); refreshData(); } catch(e){showToast('Error',true);} }
@@ -956,7 +962,7 @@
             const backup = {
                 keys: globalKeys.map(k => ({key: k.key, proxy_ip: globalProxies.find(p=>p.id===k.home_proxy_id)?.ip, proxy_port: globalProxies.find(p=>p.id===k.home_proxy_id)?.port})),
                 proxies: globalProxies.map(p => ({ip: p.ip, port: p.port, username: p.username, password: p.password})),
-                client_keys: globalClientKeys.map(k => ({name: k.name}))
+                client_keys: globalClientKeys.map(k => ({name: k.name, key: k.key}))
             };
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
             const dlAnchorElem = document.createElement('a');
@@ -1003,11 +1009,11 @@
                         }
                     }
                     
-                    // Restore Client Keys
+                    // Restore Client Keys (preserve original key value so existing clients/bots keep working)
                     if (data.client_keys) {
                         for(let c of data.client_keys) {
-                            if(!globalClientKeys.find(ext => ext.name === c.name)) {
-                                await fetch('/admin/client-keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ name: c.name }) });
+                            if(!globalClientKeys.find(ext => (c.key && ext.key === c.key) || ext.name === c.name)) {
+                                await fetch('/admin/client-keys', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ name: c.name, key: c.key }) });
                             }
                         }
                     }
