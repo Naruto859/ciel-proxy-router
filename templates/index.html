@@ -386,7 +386,7 @@
                 <div class="relative">
                     <button onclick="toggleMenu()" class="refresh-btn p-2 md:p-3 rounded-xl text-xl md:text-2xl leading-none w-10 h-10 md:w-12 md:h-12 flex items-center justify-center">⋮</button>
                     <div id="dropdown-menu" class="absolute right-0 mt-2 w-56 glass-panel py-2 hidden flex-col z-50">
-                        <button onclick="showModal('modal-polling'); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full uppercase font-black">Kernel Settings</button>
+                        <button onclick="showPollingModal(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full uppercase font-black">Kernel Settings</button>
                         <button onclick="showModal('password-modal'); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-white w-full">Change Password</button>
                         <div class="border-t border-white/10 my-1"></div>
                         <button onclick="exportData(); toggleMenu()" class="px-4 py-2 text-left hover:bg-white/10 text-sm text-[#00ffd6] font-bold w-full flex items-center gap-2">↓ Export Backup</button>
@@ -841,32 +841,29 @@
         async function testKey(k) { showToast('Verifying...'); try { const res=await fetch('/admin/test/'+k,{headers:{'Authorization':`Bearer ${sessionToken}`}}); const d=await res.json(); document.getElementById('v-ip').innerText=d.ip||'VPS IP (Direct)'; document.getElementById('v-bal').innerText=(d.balance>0?d.balance:0).toFixed(4)+' P'; document.getElementById('v-status').innerHTML=d.success?'<span style="color:#00ffd6">VERIFIED</span>':'<span style="color:#ff5757">FAILED</span>'; showModal('modal-verify'); refreshData(); } catch(e){showToast('Error',true);} }
         
         async function showPollingModal() {
-            const [resP, resF, resH, resA] = await Promise.all([
+            const [resP, resF, resH] = await Promise.all([
                 fetch('/admin/settings/polling', {headers:{'Authorization':`Bearer ${sessionToken}`}}),
                 fetch('/admin/settings/force_check', {headers:{'Authorization':`Bearer ${sessionToken}`}}),
-                fetch('/admin/settings/max_hold', {headers:{'Authorization':`Bearer ${sessionToken}`}}),
-                fetch('/admin/settings/auto_heal', {headers:{'Authorization':`Bearer ${sessionToken}`}})
+                fetch('/admin/settings/max_hold', {headers:{'Authorization':`Bearer ${sessionToken}`}})
             ]);
-            if(resP.ok && resF.ok && resH.ok && resA.ok) {
+            if(resP.ok && resF.ok && resH.ok) {
                 document.getElementById('poll-sec').value = (await resP.json()).interval;
                 document.getElementById('force-sec').value = (await resF.json()).interval;
                 document.getElementById('hold-sec').value = (await resH.json()).duration;
-                document.getElementById('auto-heal-check').checked = (await resA.json()).enabled;
-                showModal('modal-polling');
             }
+            showModal('modal-polling');
         }
-        
+
         async function savePolling() {
-            const poll = parseInt(document.getElementById('poll-sec').value); 
-            const force = parseInt(document.getElementById('force-sec').value); 
+            const poll = parseInt(document.getElementById('poll-sec').value);
+            const force = parseInt(document.getElementById('force-sec').value);
             const hold = parseInt(document.getElementById('hold-sec').value);
-            const autoHeal = document.getElementById('auto-heal-check').checked;
-            
+            if (isNaN(poll) || isNaN(force) || isNaN(hold)) { showToast('Please enter valid numbers', true); return; }
+
             await Promise.all([
                 fetch('/admin/settings/polling',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({interval:poll})}),
                 fetch('/admin/settings/force_check',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({interval:force})}),
-                fetch('/admin/settings/max_hold',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({duration:hold})}),
-                fetch('/admin/settings/auto_heal',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({enabled:autoHeal})})
+                fetch('/admin/settings/max_hold',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`},body:JSON.stringify({duration:hold})})
             ]);
             hideModal('modal-polling'); showToast('Kernel Settings Updated');
         }
